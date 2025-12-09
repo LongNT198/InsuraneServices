@@ -17,10 +17,14 @@ import {
 import { useToast } from "../../shared/contexts/ToastContext";
 import Toast from "../../shared/components/Toast/Toast";
 import adminService from "../../shared/api/services/adminService";
+import managerApplicationsService from "/src/features/shared/api/services/managerApplicationsService";
+import { ManagerApplicationExtraDetails } from "../components/ManagerApplicationExtraDetails";
 
 export function ApplicationsManagement() {
-  const { showSuccess, showError, showWarning } = useToast();
+  const { showSuccess, showError, showWarning, showInfo } = useToast();
+
   const [applications, setApplications] = useState([]);
+
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   const [selectedApp, setSelectedApp] = useState(null);
@@ -42,17 +46,21 @@ export function ApplicationsManagement() {
   });
   const [isRefreshing, setIsRefreshing] = useState(false);
 
+  // ===== Chi tiết lấy thêm từ Manager API =====
+  const [managerDetails, setManagerDetails] = useState(null);
+  const [loadingManagerDetails, setLoadingManagerDetails] = useState(false);
+
   // Fetch applications on component mount
   useEffect(() => {
     fetchApplications();
     fetchStats();
-    
+
     // Auto-refresh every 15 seconds to get real-time updates
     const interval = setInterval(() => {
       fetchApplications();
       fetchStats();
     }, 15000);
-    
+
     return () => clearInterval(interval);
   }, []);
 
@@ -60,18 +68,18 @@ export function ApplicationsManagement() {
     try {
       setLoading(true);
       const response = await adminService.getRegistrationSessions();
-      
+
       console.log("API Response:", response);
       console.log("Response type:", typeof response);
       console.log("Is array?", Array.isArray(response));
-      
+
       // Handle both direct array and wrapped response
       let data = Array.isArray(response) ? response : response?.data || [];
-      
+
       console.log("Processed data:", data);
       console.log("Data is array?", Array.isArray(data));
       console.log("Data length:", data?.length || 0);
-      
+
       if (!Array.isArray(data) || data.length === 0) {
         console.warn("No applications in database, using mock data");
         setApplications(getMockApplications());
@@ -83,7 +91,10 @@ export function ApplicationsManagement() {
       const getApplicantName = (applicantData) => {
         if (!applicantData) return "N/A";
         try {
-          const data = typeof applicantData === "string" ? JSON.parse(applicantData) : applicantData;
+          const data =
+            typeof applicantData === "string"
+              ? JSON.parse(applicantData)
+              : applicantData;
           if (data.firstName && data.lastName) {
             return `${data.firstName} ${data.lastName}`;
           }
@@ -93,7 +104,7 @@ export function ApplicationsManagement() {
           return "N/A";
         }
       };
-      
+
       // Map response from actual Application model to component expectations
       const mappedApps = data.map((app) => ({
         id: app.id,
@@ -129,7 +140,7 @@ export function ApplicationsManagement() {
     } catch (err) {
       console.error("Error fetching applications:", err);
       console.error("Error details:", err.response || err.message);
-      setError(`Lỗi: ${err.message || "Không thể kết nối đến server"}`);
+      setError(`Error: ${err.message || "Unable to connect to the server"}`);
       // Use mock data as fallback
       setApplications(getMockApplications());
     } finally {
@@ -165,13 +176,13 @@ export function ApplicationsManagement() {
       id: 1,
       userId: "nguyen.van.a",
       currentStep: "HealthDeclared",
-      registrationStatus: "InProgress",
+      registrationStatus: "In Review",
       createdDate: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
       lastUpdateDate: new Date().toISOString(),
       selectedProductId: 1,
       selectedCoverageAmount: 500000,
       selectedTermYears: 10,
-      notes: "Chờ xác nhận sức khỏe",
+      notes: "Waiting for health confirmation",
       rejectionReason: "",
       sessionToken: "token-001",
       completedDate: null,
@@ -180,29 +191,39 @@ export function ApplicationsManagement() {
       id: 2,
       userId: "tran.thi.b",
       currentStep: "PolicyIssued",
-      registrationStatus: "Completed",
-      createdDate: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
-      lastUpdateDate: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+      registrationStatus: "Approved",
+      createdDate: new Date(
+        Date.now() - 10 * 24 * 60 * 60 * 1000
+      ).toISOString(),
+      lastUpdateDate: new Date(
+        Date.now() - 2 * 24 * 60 * 60 * 1000
+      ).toISOString(),
       selectedProductId: 2,
       selectedCoverageAmount: 300000,
       selectedTermYears: 15,
-      notes: "Đã phê duyệt và cấp chính sách",
+      notes: "Approved and policy issued",
       rejectionReason: "",
       sessionToken: "token-002",
-      completedDate: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+      completedDate: new Date(
+        Date.now() - 2 * 24 * 60 * 60 * 1000
+      ).toISOString(),
     },
     {
       id: 3,
       userId: "le.van.c",
       currentStep: "UnderwritingApproved",
       registrationStatus: "Rejected",
-      createdDate: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(),
-      lastUpdateDate: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+      createdDate: new Date(
+        Date.now() - 15 * 24 * 60 * 60 * 1000
+      ).toISOString(),
+      lastUpdateDate: new Date(
+        Date.now() - 5 * 24 * 60 * 60 * 1000
+      ).toISOString(),
       selectedProductId: 1,
       selectedCoverageAmount: 1000000,
       selectedTermYears: 20,
       notes: "",
-      rejectionReason: "Tình trạng sức khỏe không phù hợp với mức bảo hiểm",
+      rejectionReason: "Health condition does not meet insurance requirements.",
       sessionToken: "token-003",
       completedDate: null,
     },
@@ -210,13 +231,15 @@ export function ApplicationsManagement() {
       id: 4,
       userId: "pham.minh.d",
       currentStep: "ProductSelected",
-      registrationStatus: "InProgress",
+      registrationStatus: "In Review",
       createdDate: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-      lastUpdateDate: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
+      lastUpdateDate: new Date(
+        Date.now() - 1 * 24 * 60 * 60 * 1000
+      ).toISOString(),
       selectedProductId: 3,
       selectedCoverageAmount: 200000,
       selectedTermYears: 5,
-      notes: "Chờ khai báo sức khỏe",
+      notes: "Waiting for health declaration",
       rejectionReason: "",
       sessionToken: "token-004",
       completedDate: null,
@@ -234,16 +257,25 @@ export function ApplicationsManagement() {
   });
 
   const handleViewDetails = async (app) => {
+    setSelectedApp(null);
+    setShowDetailsModal(true);
+
+    // Reset manager extra details mỗi lần mở
+    setManagerDetails(null);
+    setLoadingManagerDetails(true);
+
     try {
+      // ===== 1. Lấy chi tiết chính bằng adminService (logic cũ) =====
       const response = await adminService.getRegistrationSessionById?.(app.id);
       if (response) {
         // Extract applicant name from ApplicantData JSON
         let applicantName = "N/A";
         if (response.applicantData) {
           try {
-            const data = typeof response.applicantData === "string" 
-              ? JSON.parse(response.applicantData) 
-              : response.applicantData;
+            const data =
+              typeof response.applicantData === "string"
+                ? JSON.parse(response.applicantData)
+                : response.applicantData;
             if (data.firstName && data.lastName) {
               applicantName = `${data.firstName} ${data.lastName}`;
             } else {
@@ -253,7 +285,7 @@ export function ApplicationsManagement() {
             console.error("Error parsing applicant data:", err);
           }
         }
-        
+
         // Map backend fields to frontend expected fields
         setDetailsApp({
           ...response,
@@ -269,17 +301,33 @@ export function ApplicationsManagement() {
           createdDate: response.createdAt,
           lastUpdateDate: response.updatedAt,
           submittedDate: response.submittedAt,
-          reviewedDate: response.reviewedAt
+          reviewedDate: response.reviewedAt,
         });
       } else {
         setDetailsApp(app);
       }
+
+      // ===== 2. Gọi thêm Manager API để lấy Customer / Health / Beneficiaries =====
+      try {
+        const mgrRes = await managerApplicationsService.getApplicationDetails(
+          app.id
+        );
+        const mgrApp = mgrRes?.data?.application;
+        if (mgrApp) {
+          setManagerDetails(mgrApp);
+        } else {
+          setManagerDetails(null);
+        }
+      } catch (mgrErr) {
+        console.error("Error loading manager extra details:", mgrErr);
+        setManagerDetails(null);
+      }
     } catch (err) {
       console.error("Error fetching details:", err);
       setDetailsApp(app);
+    } finally {
+      setLoadingManagerDetails(false);
     }
-    setShowDetailsModal(true);
-    setSelectedApp(null);
   };
 
   const handleApproveClick = (app) => {
@@ -302,7 +350,7 @@ export function ApplicationsManagement() {
 
   const handleConfirmAction = async () => {
     if (!actionNotes.trim()) {
-      showWarning("Vui lòng nhập ghi chú hoặc lý do");
+      showWarning("Please enter notes or a reason.");
       return;
     }
 
@@ -320,7 +368,7 @@ export function ApplicationsManagement() {
           app.id === actionApp.id
             ? {
                 ...app,
-                registrationStatus: "Completed",
+                registrationStatus: "Approved",
                 currentStep: "PolicyIssued",
                 notes: actionNotes,
                 completedDate: new Date().toISOString(),
@@ -353,12 +401,13 @@ export function ApplicationsManagement() {
       fetchStats();
     } catch (err) {
       console.error(`Error ${actionType}ing application:`, err);
-      showError(
-        err.message || `Không thể ${actionType === "approve" ? "phê duyệt" : "từ chối"} đơn`
-      );
-      setActionError(
-        err.message || `Không thể ${actionType === "approve" ? "phê duyệt" : "từ chối"} đơn`
-      );
+      const msg =
+        err.message ||
+        `Unable to ${
+          actionType === "approve" ? "approve" : "reject"
+        } this application`;
+      showError(msg);
+      setActionError(msg);
     } finally {
       setActionLoading((prev) => ({ ...prev, [actionApp.id]: false }));
     }
@@ -423,7 +472,7 @@ export function ApplicationsManagement() {
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Applications</h1>
             <p className="text-gray-600 mt-2">
-              Manage and process insurance applications from customers
+              Review and manage customers' insurance applications
             </p>
           </div>
           <button
@@ -431,7 +480,9 @@ export function ApplicationsManagement() {
             disabled={isRefreshing}
             className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
           >
-            <RefreshCw className={`w-5 h-5 ${isRefreshing ? "animate-spin" : ""}`} />
+            <RefreshCw
+              className={`w-5 h-5 ${isRefreshing ? "animate-spin" : ""}`}
+            />
             {isRefreshing ? "Loading..." : "Refresh"}
           </button>
         </div>
@@ -456,8 +507,11 @@ export function ApplicationsManagement() {
                 <p className="text-sm text-gray-600">Pending</p>
                 <p className="text-3xl font-bold text-yellow-600">
                   {stats.inProgressCount ||
-                    applications.filter((a) => a.registrationStatus === "Submitted" || a.registrationStatus === "In Review")
-                      .length}
+                    applications.filter(
+                      (a) =>
+                        a.registrationStatus === "Submitted" ||
+                        a.registrationStatus === "In Review"
+                    ).length}
                 </p>
               </div>
               <Clock className="w-10 h-10 text-yellow-600 opacity-20" />
@@ -470,8 +524,9 @@ export function ApplicationsManagement() {
                 <p className="text-sm text-gray-600">Approved</p>
                 <p className="text-3xl font-bold text-green-600">
                   {stats.completedCount ||
-                    applications.filter((a) => a.registrationStatus === "Approved")
-                      .length}
+                    applications.filter(
+                      (a) => a.registrationStatus === "Approved"
+                    ).length}
                 </p>
               </div>
               <CheckCircle className="w-10 h-10 text-green-600 opacity-20" />
@@ -484,8 +539,9 @@ export function ApplicationsManagement() {
                 <p className="text-sm text-gray-600">Rejected</p>
                 <p className="text-3xl font-bold text-red-600">
                   {stats.rejectedCount ||
-                    applications.filter((a) => a.registrationStatus === "Rejected")
-                      .length}
+                    applications.filter(
+                      (a) => a.registrationStatus === "Rejected"
+                    ).length}
                 </p>
               </div>
               <XCircle className="w-10 h-10 text-red-600 opacity-20" />
@@ -530,7 +586,7 @@ export function ApplicationsManagement() {
             <div className="flex items-start gap-3">
               <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
               <div>
-                <h3 className="font-semibold text-red-900">Lỗi</h3>
+                <h3 className="font-semibold text-red-900">Error</h3>
                 <p className="text-sm text-red-700 mt-1">{error}</p>
               </div>
             </div>
@@ -581,9 +637,9 @@ export function ApplicationsManagement() {
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-900 font-semibold">
                         {app.selectedCoverageAmount
-                          ? new Intl.NumberFormat('en-US', {
-                              style: 'currency',
-                              currency: 'USD'
+                          ? new Intl.NumberFormat("en-US", {
+                              style: "currency",
+                              currency: "USD",
                             }).format(app.selectedCoverageAmount)
                           : "N/A"}
                       </td>
@@ -600,13 +656,19 @@ export function ApplicationsManagement() {
                         </div>
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-600">
-                        {app.createdDate ? new Date(app.createdDate).toLocaleDateString("vi-VN") : "N/A"}
+                        {app.createdDate
+                          ? new Date(app.createdDate).toLocaleDateString(
+                              "vi-VN"
+                            )
+                          : "N/A"}
                       </td>
                       <td className="px-6 py-4">
                         <div className="relative">
                           <button
                             onClick={() =>
-                              setSelectedApp(selectedApp === app.id ? null : app.id)
+                              setSelectedApp(
+                                selectedApp === app.id ? null : app.id
+                              )
                             }
                             disabled={actionLoading[app.id]}
                             className="p-1 hover:bg-gray-100 rounded disabled:opacity-50"
@@ -625,37 +687,40 @@ export function ApplicationsManagement() {
                                 className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-gray-700"
                               >
                                 <Eye className="w-4 h-4" />
-                                Xem Chi Tiết
+                                View Details
                               </button>
 
-                              {app.registrationStatus !== "Approved" && app.registrationStatus !== "Rejected" && (
-                                <>
-                                  <button
-                                    onClick={() => handleApproveClick(app)}
-                                    className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-green-600"
-                                  >
-                                    <CheckCircle className="w-4 h-4" />
-                                    Duyệt Đơn
-                                  </button>
-                                  <button
-                                    onClick={() => handleRejectClick(app)}
-                                    className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-red-600"
-                                  >
-                                    <XCircle className="w-4 h-4" />
-                                    Từ Chối Đơn
-                                  </button>
-                                </>
-                              )}
+                              {app.registrationStatus !== "Approved" &&
+                                app.registrationStatus !== "Rejected" && (
+                                  <>
+                                    <button
+                                      onClick={() => handleApproveClick(app)}
+                                      className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-green-600"
+                                    >
+                                      <CheckCircle className="w-4 h-4" />
+                                      Approve Application
+                                    </button>
+                                    <button
+                                      onClick={() => handleRejectClick(app)}
+                                      className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-red-600"
+                                    >
+                                      <XCircle className="w-4 h-4" />
+                                      Reject Application
+                                    </button>
+                                  </>
+                                )}
 
                               <button
                                 onClick={() => {
-                                  showInfo(`📥 Đang tải xuống: Đơn #${app.id}`);
+                                  showInfo(
+                                    `📥 Downloading application #${app.id}`
+                                  );
                                   setSelectedApp(null);
                                 }}
                                 className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-blue-600"
                               >
                                 <Download className="w-4 h-4" />
-                                Tải Xuống
+                                Download
                               </button>
                             </div>
                           )}
@@ -669,7 +734,7 @@ export function ApplicationsManagement() {
           ) : (
             <div className="p-8 text-center">
               <FileText className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-600">Không có đơn đăng ký nào</p>
+              <p className="text-gray-600">No applications found</p>
             </div>
           )}
         </div>
@@ -680,23 +745,26 @@ export function ApplicationsManagement() {
             <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full my-8">
               <div className="border-b border-gray-200 p-6 sticky top-0 bg-white z-10">
                 <h2 className="text-2xl font-bold text-gray-900">
-                  Chi Tiết Đơn Đăng Ký - {detailsApp.applicationNumber || `#${detailsApp.id}`}
+                  Application Details -{" "}
+                  {detailsApp.applicationNumber || `#${detailsApp.id}`}
                 </h2>
               </div>
 
               <div className="p-6 space-y-6">
                 {/* Customer Information */}
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-3">Thông Tin Khách Hàng</h3>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3">
+                    Customer Information
+                  </h3>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <p className="text-sm text-gray-600">Tên Khách Hàng</p>
+                      <p className="text-sm text-gray-600">Customer Name</p>
                       <p className="text-base font-semibold text-gray-900">
                         {detailsApp.applicantName || "N/A"}
                       </p>
                     </div>
                     <div>
-                      <p className="text-sm text-gray-600">ID Người Dùng</p>
+                      <p className="text-sm text-gray-600">User ID</p>
                       <p className="text-base font-medium text-gray-900 truncate">
                         {detailsApp.userId}
                       </p>
@@ -706,50 +774,54 @@ export function ApplicationsManagement() {
 
                 {/* Product Information */}
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-3">Thông Tin Sản Phẩm</h3>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3">
+                    Product Information
+                  </h3>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <p className="text-sm text-gray-600">Sản Phẩm</p>
+                      <p className="text-sm text-gray-600">Product</p>
                       <p className="text-base font-semibold text-gray-900">
                         {detailsApp.productName || "N/A"}
                       </p>
                     </div>
                     <div>
-                      <p className="text-sm text-gray-600">Loại Sản Phẩm</p>
+                      <p className="text-sm text-gray-600">Product Type</p>
                       <p className="text-base font-semibold text-gray-900">
                         {detailsApp.productType || "N/A"}
                       </p>
                     </div>
                     <div>
-                      <p className="text-sm text-gray-600">Số Tiền Bảo Hiểm</p>
+                      <p className="text-sm text-gray-600">Coverage Amount</p>
                       <p className="text-base font-semibold text-blue-600">
                         {detailsApp.selectedCoverageAmount
-                          ? new Intl.NumberFormat('vi-VN', {
-                              style: 'currency',
-                              currency: 'VND'
+                          ? new Intl.NumberFormat("vi-VN", {
+                              style: "currency",
+                              currency: "VND",
                             }).format(detailsApp.selectedCoverageAmount)
                           : "N/A"}
                       </p>
                     </div>
                     <div>
-                      <p className="text-sm text-gray-600">Thời Hạn</p>
+                      <p className="text-sm text-gray-600">Term</p>
                       <p className="text-base font-semibold text-gray-900">
-                        {detailsApp.selectedTermYears ? `${detailsApp.selectedTermYears} năm` : "N/A"}
+                        {detailsApp.selectedTermYears
+                          ? `${detailsApp.selectedTermYears} years`
+                          : "N/A"}
                       </p>
                     </div>
                     <div>
-                      <p className="text-sm text-gray-600">Tần Suất Thanh Toán</p>
+                      <p className="text-sm text-gray-600">Payment Frequency</p>
                       <p className="text-base font-semibold text-gray-900">
                         {detailsApp.paymentFrequency || "N/A"}
                       </p>
                     </div>
                     <div>
-                      <p className="text-sm text-gray-600">Phí Bảo Hiểm</p>
+                      <p className="text-sm text-gray-600">Premium</p>
                       <p className="text-base font-semibold text-green-600">
                         {detailsApp.premiumAmount
-                          ? new Intl.NumberFormat('vi-VN', {
-                              style: 'currency',
-                              currency: 'VND'
+                          ? new Intl.NumberFormat("vi-VN", {
+                              style: "currency",
+                              currency: "VND",
                             }).format(detailsApp.premiumAmount)
                           : "N/A"}
                       </p>
@@ -759,10 +831,12 @@ export function ApplicationsManagement() {
 
                 {/* Status Information */}
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-3">Trạng Thái & Thời Gian</h3>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3">
+                    Status & Timeline
+                  </h3>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <p className="text-sm text-gray-600">Trạng Thái Hiện Tại</p>
+                      <p className="text-sm text-gray-600">Current Status</p>
                       <div className="flex items-center gap-2 mt-1">
                         {getStatusIcon(detailsApp.registrationStatus)}
                         <span
@@ -775,40 +849,72 @@ export function ApplicationsManagement() {
                       </div>
                     </div>
                     <div>
-                      <p className="text-sm text-gray-600">Ngày Tạo</p>
+                      <p className="text-sm text-gray-600">Created At</p>
                       <p className="text-base font-medium text-gray-900">
-                        {detailsApp.createdDate ? new Date(detailsApp.createdDate).toLocaleString("vi-VN") : "N/A"}
+                        {detailsApp.createdDate
+                          ? new Date(detailsApp.createdDate).toLocaleString(
+                              "vi-VN"
+                            )
+                          : "N/A"}
                       </p>
                     </div>
                     <div>
-                      <p className="text-sm text-gray-600">Ngày Cập Nhật</p>
+                      <p className="text-sm text-gray-600">Last Updated</p>
                       <p className="text-base font-medium text-gray-900">
-                        {detailsApp.lastUpdateDate ? new Date(detailsApp.lastUpdateDate).toLocaleString("vi-VN") : "N/A"}
+                        {detailsApp.lastUpdateDate
+                          ? new Date(detailsApp.lastUpdateDate).toLocaleString(
+                              "vi-VN"
+                            )
+                          : "N/A"}
                       </p>
                     </div>
                     {detailsApp.submittedDate && (
                       <div>
-                        <p className="text-sm text-gray-600">Ngày Nộp</p>
+                        <p className="text-sm text-gray-600">Submitted At</p>
                         <p className="text-base font-medium text-gray-900">
-                          {new Date(detailsApp.submittedDate).toLocaleString("vi-VN")}
+                          {new Date(detailsApp.submittedDate).toLocaleString(
+                            "vi-VN"
+                          )}
                         </p>
                       </div>
                     )}
                     {detailsApp.reviewedDate && (
                       <div>
-                        <p className="text-sm text-gray-600">Ngày Xét Duyệt</p>
+                        <p className="text-sm text-gray-600">
+                          Reviewed / Decided At
+                        </p>
                         <p className="text-base font-medium text-gray-900">
-                          {new Date(detailsApp.reviewedDate).toLocaleString("vi-VN")}
+                          {new Date(detailsApp.reviewedDate).toLocaleString(
+                            "vi-VN"
+                          )}
                         </p>
                       </div>
                     )}
                   </div>
                 </div>
 
+                {/* ====== BỔ SUNG: Customer / Health / Beneficiaries từ Manager API ====== */}
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3">
+                    Extra Details for Manager
+                  </h3>
+                  {loadingManagerDetails ? (
+                    <div className="flex items-center gap-2 text-sm text-gray-500">
+                      <Loader className="w-4 h-4 animate-spin" />
+                      Loading additional details (Customer / Health /
+                      Beneficiaries)...
+                    </div>
+                  ) : (
+                    <ManagerApplicationExtraDetails details={managerDetails} />
+                  )}
+                </div>
+
                 {/* Notes */}
                 {detailsApp.notes && (
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">Ghi Chú</h3>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                      Review Notes
+                    </h3>
                     <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
                       <p className="text-gray-900">{detailsApp.notes}</p>
                     </div>
@@ -817,67 +923,85 @@ export function ApplicationsManagement() {
 
                 {detailsApp.rejectionReason && (
                   <div>
-                    <h3 className="text-lg font-semibold text-red-900 mb-2">Lý Do Từ Chối</h3>
+                    <h3 className="text-lg font-semibold text-red-900 mb-2">
+                      Rejection Reason
+                    </h3>
                     <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                      <p className="text-red-900">{detailsApp.rejectionReason}</p>
+                      <p className="text-red-900">
+                        {detailsApp.rejectionReason}
+                      </p>
                     </div>
                   </div>
                 )}
 
                 {/* Status Update Section */}
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-3">Điều Chỉnh Trạng Thái</h3>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3">
+                    Adjust Status
+                  </h3>
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                     <div className="grid grid-cols-1 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Thay Đổi Trạng Thái
+                          Change Status
                         </label>
                         <select
                           value={detailsApp.registrationStatus}
                           onChange={(e) => {
-                            setDetailsApp({ ...detailsApp, registrationStatus: e.target.value });
+                            setDetailsApp({
+                              ...detailsApp,
+                              registrationStatus: e.target.value,
+                            });
                           }}
                           className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                         >
-                          <option value="Submitted">Đã Nộp</option>
-                          <option value="In Review">Đang Xét</option>
-                          <option value="Approved">Đã Phê Duyệt</option>
-                          <option value="Rejected">Từ Chối</option>
+                          <option value="Submitted">Submitted</option>
+                          <option value="In Review">Under Review</option>
+                          <option value="Approved">Approved</option>
+                          <option value="Rejected">Rejected</option>
                         </select>
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Ghi Chú Thêm
+                          Additional Notes
                         </label>
                         <textarea
                           value={detailsApp.notes || ""}
                           onChange={(e) => {
-                            setDetailsApp({ ...detailsApp, notes: e.target.value });
+                            setDetailsApp({
+                              ...detailsApp,
+                              notes: e.target.value,
+                            });
                           }}
                           rows={3}
-                          placeholder="Nhập ghi chú hoặc lý do..."
+                          placeholder="Enter notes or reason..."
                           className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
                       </div>
                       <button
                         onClick={async () => {
                           try {
-                            await adminService.updateApplicationStatus(detailsApp.id, {
-                              status: detailsApp.registrationStatus,
-                              reviewNotes: detailsApp.notes
-                            });
+                            await adminService.updateApplicationStatus(
+                              detailsApp.id,
+                              {
+                                status: detailsApp.registrationStatus,
+                                reviewNotes: detailsApp.notes,
+                              }
+                            );
                             await fetchApplications();
                             setShowDetailsModal(false);
-                            showSuccess("✅ Cập nhật trạng thái thành công!");
+                            setManagerDetails(null);
+                            showSuccess("✅ Status updated successfully!");
                           } catch (err) {
                             console.error("Error updating status:", err);
-                            showError("❌ Lỗi khi cập nhật trạng thái: " + err.message);
+                            showError(
+                              "❌ Failed to update status: " + err.message
+                            );
                           }
                         }}
                         className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold"
                       >
-                        Lưu Thay Đổi
+                        Save Changes
                       </button>
                     </div>
                   </div>
@@ -885,35 +1009,41 @@ export function ApplicationsManagement() {
               </div>
 
               <div className="border-t border-gray-200 p-6 flex justify-end gap-3 sticky bottom-0 bg-white">
-                {detailsApp.registrationStatus !== "Approved" && detailsApp.registrationStatus !== "Rejected" && (
-                  <>
-                    <button
-                      onClick={() => {
-                        setShowDetailsModal(false);
-                        handleApproveClick(detailsApp);
-                      }}
-                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
-                    >
-                      <CheckCircle className="w-4 h-4" />
-                      Phê Duyệt
-                    </button>
-                    <button
-                      onClick={() => {
-                        setShowDetailsModal(false);
-                        handleRejectClick(detailsApp);
-                      }}
-                      className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2"
-                    >
-                      <XCircle className="w-4 h-4" />
-                      Từ Chối
-                    </button>
-                  </>
-                )}
+                {detailsApp.registrationStatus !== "Approved" &&
+                  detailsApp.registrationStatus !== "Rejected" && (
+                    <>
+                      <button
+                        onClick={() => {
+                          setShowDetailsModal(false);
+                          setManagerDetails(null);
+                          handleApproveClick(detailsApp);
+                        }}
+                        className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
+                      >
+                        <CheckCircle className="w-4 h-4" />
+                        Approve
+                      </button>
+                      <button
+                        onClick={() => {
+                          setShowDetailsModal(false);
+                          setManagerDetails(null);
+                          handleRejectClick(detailsApp);
+                        }}
+                        className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2"
+                      >
+                        <XCircle className="w-4 h-4" />
+                        Reject
+                      </button>
+                    </>
+                  )}
                 <button
-                  onClick={() => setShowDetailsModal(false)}
+                  onClick={() => {
+                    setShowDetailsModal(false);
+                    setManagerDetails(null);
+                  }}
                   className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
                 >
-                  Đóng
+                  Close
                 </button>
               </div>
             </div>
@@ -926,23 +1056,28 @@ export function ApplicationsManagement() {
             <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
               <div className="border-b border-gray-200 p-6">
                 <h2 className="text-2xl font-bold text-gray-900">
-                  {actionType === "approve" ? "Duyệt Đơn" : "Từ Chối Đơn"}
+                  {actionType === "approve"
+                    ? "Approve Application"
+                    : "Reject Application"}
                 </h2>
               </div>
 
               <div className="p-6 space-y-4">
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                   <p className="text-sm text-blue-700">
-                    <strong>ID Đơn:</strong> #{actionApp.id}
+                    <strong>Application ID:</strong> #{actionApp.id}
                   </p>
                   <p className="text-sm text-blue-700 mt-1">
-                    <strong>Người Dùng:</strong> {actionApp.userId}
+                    <strong>User ID:</strong> {actionApp.userId}
                   </p>
                 </div>
 
                 <div>
                   <label className="block text-sm font-semibold text-gray-900 mb-2">
-                    {actionType === "approve" ? "Ghi Chú Duyệt" : "Lý Do Từ Chối"} *
+                    {actionType === "approve"
+                      ? "Approval Notes"
+                      : "Rejection Reason"}{" "}
+                    *
                   </label>
                   <textarea
                     value={actionNotes}
@@ -950,8 +1085,8 @@ export function ApplicationsManagement() {
                     rows="4"
                     placeholder={
                       actionType === "approve"
-                        ? "Nhập ghi chú duyệt..."
-                        : "Nhập lý do từ chối..."
+                        ? "Enter approval notes..."
+                        : "Enter rejection reason..."
                     }
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
@@ -973,26 +1108,30 @@ export function ApplicationsManagement() {
                   }}
                   className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
                 >
-                  Hủy
+                  Cancel
                 </button>
                 <button
                   onClick={handleConfirmAction}
                   disabled={actionLoading[actionApp.id]}
-                  className={`inline-flex items-center gap-2 px-4 py-2 text-white rounded-lg transition-colors ${
-                    actionType === "approve"
-                      ? "bg-green-600 hover:bg-green-700 disabled:opacity-50"
-                      : "bg-red-600 hover:bg-red-700 disabled:opacity-50"
-                  }`}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg transition-colors font-semibold disabled:opacity-50"
+                  style={{
+                    backgroundColor:
+                      actionType === "approve" ? "#16a34a" : "#dc2626", // green / red
+                    color: "#ffffff",
+                    cursor: actionLoading[actionApp.id]
+                      ? "not-allowed"
+                      : "pointer",
+                  }}
                 >
                   {actionLoading[actionApp.id] ? (
                     <>
                       <Loader className="w-4 h-4 animate-spin" />
-                      Đang xử lý...
+                      Processing...
                     </>
                   ) : (
                     <>
                       <Send className="w-4 h-4" />
-                      {actionType === "approve" ? "Duyệt" : "Từ Chối"}
+                      {actionType === "approve" ? "Approve" : "Reject"}
                     </>
                   )}
                 </button>

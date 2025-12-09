@@ -1,61 +1,142 @@
-import { useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../shared/components/ui/card';
-import { Button } from '../../shared/components/ui/button';
-import { Input } from '../../shared/components/ui/input';
-import { Label } from '../../shared/components/ui/label';
-import { RadioGroup, RadioGroupItem } from '../../shared/components/ui/radio-group';
-import { CreditCard, Wallet, Building, Smartphone, Shield, CheckCircle, AlertCircle } from 'lucide-react';
-import { Alert, AlertDescription } from '../../shared/components/ui/alert';
+import { useState } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "../../shared/components/ui/card";
+import { Button } from "../../shared/components/ui/button";
+import { Input } from "../../shared/components/ui/input";
+import { Label } from "../../shared/components/ui/label";
+import {
+  RadioGroup,
+  RadioGroupItem,
+} from "../../shared/components/ui/radio-group";
+import {
+  CreditCard,
+  Wallet,
+  Building,
+  Smartphone,
+  Shield,
+  CheckCircle,
+} from "lucide-react";
+import { Alert, AlertDescription } from "../../shared/components/ui/alert";
+
+// 💳 service gọi API payment
+import paymentsService from "../../shared/api/services/paymentsService";
+// 🔔 toast thông báo
+import { useToast } from "../../shared/contexts/ToastContext";
 
 export function PaymentGateway() {
   const navigate = useNavigate();
   const location = useLocation();
-  const paymentData = location.state || { amount: 25000, purpose: 'Premium Payment' };
+  const { showSuccess, showError } = useToast();
 
-  const [paymentMethod, setPaymentMethod] = useState('card');
+  // Dữ liệu truyền từ màn trước:
+  //  - paymentId: Id bản ghi Payment trong DB (bắt buộc nếu muốn thanh toán thật)
+  //  - amount: số tiền phải thanh toán
+  //  - purpose: mô tả (ví dụ: "Premium for policy XXX")
+  const paymentData = location.state || {
+    amount: 25000,
+    purpose: "Premium Payment",
+    paymentId: null, // nếu null thì sẽ chạy demo, không gọi backend
+  };
+
+  const [paymentMethod, setPaymentMethod] = useState("card");
   const [processing, setProcessing] = useState(false);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
+  const [transactionId, setTransactionId] = useState(null); // lưu TransactionId thực tế
 
   const [cardDetails, setCardDetails] = useState({
-    cardNumber: '',
-    cardName: '',
-    expiryDate: '',
-    cvv: '',
+    cardNumber: "",
+    cardName: "",
+    expiryDate: "",
+    cvv: "",
   });
 
-  const [upiId, setUpiId] = useState('');
-  const [netBankingBank, setNetBankingBank] = useState('');
+  const [upiId, setUpiId] = useState("");
+  const [netBankingBank, setNetBankingBank] = useState("");
 
   const banks = [
-    'State Bank of India',
-    'HDFC Bank',
-    'ICICI Bank',
-    'Axis Bank',
-    'Punjab National Bank',
-    'Bank of Baroda',
-    'Canara Bank',
-    'Union Bank of India',
+    "State Bank of India",
+    "HDFC Bank",
+    "ICICI Bank",
+    "Axis Bank",
+    "Punjab National Bank",
+    "Bank of Baroda",
+    "Canara Bank",
+    "Union Bank of India",
   ];
 
-  const handlePayment = () => {
-    setProcessing(true);
-    // Simulate payment processing
-    setTimeout(() => {
-      setProcessing(false);
-      setPaymentSuccess(true);
-      
-      // Redirect to success page after 2 seconds
+  // Hàm xử lý thanh toán
+  const handlePayment = async () => {
+    // Trường hợp chưa có paymentId -> đang chạy UI demo, không gọi backend
+    if (!paymentData.paymentId) {
+      setProcessing(true);
+      const fakeTxnId = `TXN-${Date.now()}`;
+      setTransactionId(fakeTxnId);
+
       setTimeout(() => {
-        navigate('/dashboard', { state: { paymentSuccess: true } });
+        setProcessing(false);
+        setPaymentSuccess(true);
+        showSuccess("Thanh toán demo thành công (chưa gọi backend)");
+
+        // Redirect sau 2s
+        setTimeout(() => {
+          navigate("/policies", { state: { paymentSuccess: true } });
+        }, 2000);
       }, 2000);
-    }, 2000);
+
+      return;
+    }
+
+    // Trường hợp có paymentId -> gọi API thực
+    setProcessing(true);
+
+    try {
+      // Map phương thức từ UI sang backend
+      const methodMap = {
+        card: "CreditCard",
+        upi: "UPI",
+        netbanking: "BankTransfer",
+        wallet: "EWallet",
+      };
+
+      const apiMethod = methodMap[paymentMethod] || "Other";
+      const generatedTxnId = `TXN-${Date.now()}`;
+
+      const response = await paymentsService.makePayment({
+        paymentId: paymentData.paymentId,
+        paymentMethod: apiMethod,
+        transactionId: generatedTxnId,
+        notes: paymentData.purpose,
+      });
+
+      const returnedTxnId =
+        response?.data?.payment?.transactionId || generatedTxnId;
+
+      setTransactionId(returnedTxnId);
+      setPaymentSuccess(true);
+      showSuccess("Thanh toán thành công");
+
+      // Redirect sau 2s (bạn có thể đổi sang /policies nếu muốn)
+      setTimeout(() => {
+        navigate("/dashboard", { state: { paymentSuccess: true } });
+      }, 2000);
+    } catch (error) {
+      console.error("Payment error:", error);
+      showError("Thanh toán thất bại, vui lòng thử lại");
+    } finally {
+      setProcessing(false);
+    }
   };
 
   const formatCardNumber = (value) => {
-    const v = value.replace(/\s+/g, '').replace(/[^0-9]/gi, '');
+    const v = value.replace(/\s+/g, "").replace(/[^0-9]/gi, "");
     const matches = v.match(/\d{4,16}/g);
-    const match = (matches && matches[0]) || '';
+    const match = (matches && matches[0]) || "";
     const parts = [];
 
     for (let i = 0, len = match.length; i < len; i += 4) {
@@ -63,12 +144,13 @@ export function PaymentGateway() {
     }
 
     if (parts.length) {
-      return parts.join(' ');
+      return parts.join(" ");
     } else {
       return value;
     }
   };
 
+  // Màn hình sau khi thanh toán thành công
   if (paymentSuccess) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
@@ -79,21 +161,23 @@ export function PaymentGateway() {
             </div>
             <h2 className="mb-2">Payment Successful!</h2>
             <p className="text-gray-600 mb-1">
-              Amount: <span className="font-semibold">₹{paymentData.amount.toLocaleString()}</span>
+              Amount:{" "}
+              <span className="font-semibold">
+                ₹{paymentData.amount.toLocaleString()}
+              </span>
             </p>
             <p className="text-sm text-gray-500 mb-6">{paymentData.purpose}</p>
             <p className="text-xs text-gray-500 mb-6">
-              Transaction ID: TXN{Date.now()}
+              Transaction ID: {transactionId || "Processing..."}
             </p>
-            <p className="text-sm text-gray-600">
-              Redirecting to dashboard...
-            </p>
+            <p className="text-sm text-gray-600">Redirecting to dashboard...</p>
           </CardContent>
         </Card>
       </div>
     );
   }
 
+  // Màn hình chọn phương thức & nhập thông tin thanh toán
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="container mx-auto px-4">
@@ -108,7 +192,9 @@ export function PaymentGateway() {
                 </div>
                 <div className="text-right">
                   <p className="text-sm text-gray-600">Amount to Pay</p>
-                  <p className="text-3xl font-bold text-blue-600">₹{paymentData.amount.toLocaleString()}</p>
+                  <p className="text-3xl font-bold text-blue-600">
+                    ₹{paymentData.amount.toLocaleString()}
+                  </p>
                 </div>
               </div>
             </CardContent>
@@ -120,51 +206,76 @@ export function PaymentGateway() {
               <Card>
                 <CardHeader>
                   <CardTitle>Select Payment Method</CardTitle>
-                  <CardDescription>Choose your preferred payment option</CardDescription>
+                  <CardDescription>
+                    Choose your preferred payment option
+                  </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <RadioGroup value={paymentMethod} onValueChange={setPaymentMethod}>
+                  <RadioGroup
+                    value={paymentMethod}
+                    onValueChange={setPaymentMethod}
+                  >
                     <div className="space-y-3">
                       <div className="flex items-center space-x-3 border rounded-lg p-4 cursor-pointer hover:bg-gray-50">
                         <RadioGroupItem value="card" id="card" />
-                        <Label htmlFor="card" className="flex items-center gap-3 cursor-pointer flex-1">
+                        <Label
+                          htmlFor="card"
+                          className="flex items-center gap-3 cursor-pointer flex-1"
+                        >
                           <CreditCard className="size-6 text-blue-600" />
                           <div>
                             <p className="font-semibold">Credit / Debit Card</p>
-                            <p className="text-sm text-gray-500">Visa, Mastercard, RuPay</p>
+                            <p className="text-sm text-gray-500">
+                              Visa, Mastercard, RuPay
+                            </p>
                           </div>
                         </Label>
                       </div>
 
                       <div className="flex items-center space-x-3 border rounded-lg p-4 cursor-pointer hover:bg-gray-50">
                         <RadioGroupItem value="upi" id="upi" />
-                        <Label htmlFor="upi" className="flex items-center gap-3 cursor-pointer flex-1">
+                        <Label
+                          htmlFor="upi"
+                          className="flex items-center gap-3 cursor-pointer flex-1"
+                        >
                           <Smartphone className="size-6 text-purple-600" />
                           <div>
                             <p className="font-semibold">UPI</p>
-                            <p className="text-sm text-gray-500">PhonePe, Google Pay, Paytm</p>
+                            <p className="text-sm text-gray-500">
+                              PhonePe, Google Pay, Paytm
+                            </p>
                           </div>
                         </Label>
                       </div>
 
                       <div className="flex items-center space-x-3 border rounded-lg p-4 cursor-pointer hover:bg-gray-50">
                         <RadioGroupItem value="netbanking" id="netbanking" />
-                        <Label htmlFor="netbanking" className="flex items-center gap-3 cursor-pointer flex-1">
+                        <Label
+                          htmlFor="netbanking"
+                          className="flex items-center gap-3 cursor-pointer flex-1"
+                        >
                           <Building className="size-6 text-green-600" />
                           <div>
                             <p className="font-semibold">Net Banking</p>
-                            <p className="text-sm text-gray-500">All major banks</p>
+                            <p className="text-sm text-gray-500">
+                              All major banks
+                            </p>
                           </div>
                         </Label>
                       </div>
 
                       <div className="flex items-center space-x-3 border rounded-lg p-4 cursor-pointer hover:bg-gray-50">
                         <RadioGroupItem value="wallet" id="wallet" />
-                        <Label htmlFor="wallet" className="flex items-center gap-3 cursor-pointer flex-1">
+                        <Label
+                          htmlFor="wallet"
+                          className="flex items-center gap-3 cursor-pointer flex-1"
+                        >
                           <Wallet className="size-6 text-orange-600" />
                           <div>
                             <p className="font-semibold">Wallets</p>
-                            <p className="text-sm text-gray-500">Paytm, PhonePe, Amazon Pay</p>
+                            <p className="text-sm text-gray-500">
+                              Paytm, PhonePe, Amazon Pay
+                            </p>
                           </div>
                         </Label>
                       </div>
@@ -177,14 +288,14 @@ export function PaymentGateway() {
               <Card>
                 <CardHeader>
                   <CardTitle>
-                    {paymentMethod === 'card' && 'Card Details'}
-                    {paymentMethod === 'upi' && 'UPI Details'}
-                    {paymentMethod === 'netbanking' && 'Select Bank'}
-                    {paymentMethod === 'wallet' && 'Select Wallet'}
+                    {paymentMethod === "card" && "Card Details"}
+                    {paymentMethod === "upi" && "UPI Details"}
+                    {paymentMethod === "netbanking" && "Select Bank"}
+                    {paymentMethod === "wallet" && "Select Wallet"}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {paymentMethod === 'card' && (
+                  {paymentMethod === "card" && (
                     <div className="space-y-4">
                       <div>
                         <Label htmlFor="cardNumber">Card Number</Label>
@@ -192,10 +303,12 @@ export function PaymentGateway() {
                           id="cardNumber"
                           placeholder="1234 5678 9012 3456"
                           value={cardDetails.cardNumber}
-                          onChange={(e) => setCardDetails({ 
-                            ...cardDetails, 
-                            cardNumber: formatCardNumber(e.target.value) 
-                          })}
+                          onChange={(e) =>
+                            setCardDetails({
+                              ...cardDetails,
+                              cardNumber: formatCardNumber(e.target.value),
+                            })
+                          }
                           maxLength={19}
                         />
                       </div>
@@ -205,7 +318,12 @@ export function PaymentGateway() {
                           id="cardName"
                           placeholder="JOHN DOE"
                           value={cardDetails.cardName}
-                          onChange={(e) => setCardDetails({ ...cardDetails, cardName: e.target.value.toUpperCase() })}
+                          onChange={(e) =>
+                            setCardDetails({
+                              ...cardDetails,
+                              cardName: e.target.value.toUpperCase(),
+                            })
+                          }
                         />
                       </div>
                       <div className="grid grid-cols-2 gap-4">
@@ -216,11 +334,15 @@ export function PaymentGateway() {
                             placeholder="MM/YY"
                             value={cardDetails.expiryDate}
                             onChange={(e) => {
-                              let value = e.target.value.replace(/\D/g, '');
+                              let value = e.target.value.replace(/\D/g, "");
                               if (value.length >= 2) {
-                                value = value.slice(0, 2) + '/' + value.slice(2, 4);
+                                value =
+                                  value.slice(0, 2) + "/" + value.slice(2, 4);
                               }
-                              setCardDetails({ ...cardDetails, expiryDate: value });
+                              setCardDetails({
+                                ...cardDetails,
+                                expiryDate: value,
+                              });
                             }}
                             maxLength={5}
                           />
@@ -232,7 +354,12 @@ export function PaymentGateway() {
                             type="password"
                             placeholder="123"
                             value={cardDetails.cvv}
-                            onChange={(e) => setCardDetails({ ...cardDetails, cvv: e.target.value.replace(/\D/g, '') })}
+                            onChange={(e) =>
+                              setCardDetails({
+                                ...cardDetails,
+                                cvv: e.target.value.replace(/\D/g, ""),
+                              })
+                            }
                             maxLength={3}
                           />
                         </div>
@@ -240,7 +367,7 @@ export function PaymentGateway() {
                     </div>
                   )}
 
-                  {paymentMethod === 'upi' && (
+                  {paymentMethod === "upi" && (
                     <div className="space-y-4">
                       <div>
                         <Label htmlFor="upiId">UPI ID</Label>
@@ -255,7 +382,9 @@ export function PaymentGateway() {
                         </p>
                       </div>
                       <div className="border rounded-lg p-4 text-center">
-                        <p className="text-sm text-gray-600 mb-2">Or scan QR code</p>
+                        <p className="text-sm text-gray-600 mb-2">
+                          Or scan QR code
+                        </p>
                         <div className="w-48 h-48 bg-gray-100 mx-auto rounded-lg flex items-center justify-center">
                           <p className="text-gray-400">QR Code</p>
                         </div>
@@ -263,7 +392,7 @@ export function PaymentGateway() {
                     </div>
                   )}
 
-                  {paymentMethod === 'netbanking' && (
+                  {paymentMethod === "netbanking" && (
                     <div>
                       <Label>Select Your Bank</Label>
                       <select
@@ -279,12 +408,12 @@ export function PaymentGateway() {
                         ))}
                       </select>
                       <p className="text-xs text-gray-500 mt-2">
-                        You will be redirected to your bank's website
+                        You will be redirected to your bank&apos;s website
                       </p>
                     </div>
                   )}
 
-                  {paymentMethod === 'wallet' && (
+                  {paymentMethod === "wallet" && (
                     <div className="space-y-3">
                       <button className="w-full border rounded-lg p-4 text-left hover:bg-gray-50">
                         <div className="flex items-center gap-3">
@@ -293,7 +422,9 @@ export function PaymentGateway() {
                           </div>
                           <div>
                             <p className="font-semibold">Paytm Wallet</p>
-                            <p className="text-sm text-gray-500">Balance: ₹5,000</p>
+                            <p className="text-sm text-gray-500">
+                              Balance: ₹5,000
+                            </p>
                           </div>
                         </div>
                       </button>
@@ -304,7 +435,9 @@ export function PaymentGateway() {
                           </div>
                           <div>
                             <p className="font-semibold">PhonePe Wallet</p>
-                            <p className="text-sm text-gray-500">Balance: ₹3,500</p>
+                            <p className="text-sm text-gray-500">
+                              Balance: ₹3,500
+                            </p>
                           </div>
                         </div>
                       </button>
@@ -315,20 +448,24 @@ export function PaymentGateway() {
                           </div>
                           <div>
                             <p className="font-semibold">Amazon Pay</p>
-                            <p className="text-sm text-gray-500">Balance: ₹2,000</p>
+                            <p className="text-sm text-gray-500">
+                              Balance: ₹2,000
+                            </p>
                           </div>
                         </div>
                       </button>
                     </div>
                   )}
 
-                  <Button 
-                    onClick={handlePayment} 
-                    className="w-full mt-6" 
+                  <Button
+                    onClick={handlePayment}
+                    className="w-full mt-6"
                     size="lg"
                     disabled={processing}
                   >
-                    {processing ? 'Processing...' : `Pay ₹${paymentData.amount.toLocaleString()}`}
+                    {processing
+                      ? "Processing..."
+                      : `Pay ₹${paymentData.amount.toLocaleString()}`}
                   </Button>
                 </CardContent>
               </Card>
@@ -367,7 +504,8 @@ export function PaymentGateway() {
                 <AlertDescription>
                   <p className="font-semibold mb-1">Secure Payment</p>
                   <p className="text-xs">
-                    Your payment information is encrypted and secure. We never store your card details.
+                    Your payment information is encrypted and secure. We never
+                    store your card details.
                   </p>
                 </AlertDescription>
               </Alert>
@@ -375,7 +513,8 @@ export function PaymentGateway() {
               <Card>
                 <CardContent className="pt-6">
                   <p className="text-xs text-gray-600 text-center">
-                    By proceeding, you agree to our Terms of Service and Privacy Policy
+                    By proceeding, you agree to our Terms of Service and Privacy
+                    Policy
                   </p>
                 </CardContent>
               </Card>
@@ -386,6 +525,3 @@ export function PaymentGateway() {
     </div>
   );
 }
-
-
-

@@ -1,71 +1,70 @@
-import axiosInstance from '../axios';
+import axiosInstance from "../axios";
 
 /**
  * Payments Service
- * Xử lý các API calls liên quan đến thanh toán
+ * Gọi tới PaymentsController (Customer)
+ *
+ * Backend hiện có các endpoint:
+ *  - GET  /api/payments/my-payments
+ *  - GET  /api/payments/{id}
+ *  - GET  /api/payments/upcoming
+ *  - GET  /api/payments/history
+ *  - POST /api/payments/make-payment
+ *
+ * Các endpoint admin (all, confirm, refund) đang dùng trong adminService,
+ * nên ở đây ta chỉ tập trung cho phía Customer.
  */
 
 const paymentsService = {
-  // Lấy danh sách giao dịch thanh toán
-  getPayments: async (params = {}) => {
-    return await axiosInstance.get('/api/payments', { params });
+  /**
+   * Lấy tất cả payments của user hiện đang đăng nhập
+   * -> dùng cho màn "My Payments" nếu sau này bạn cần
+   */
+  getMyPayments: async () => {
+    return await axiosInstance.get("/api/payments/my-payments");
   },
 
-  // Lấy chi tiết giao dịch
+  /**
+   * Lấy chi tiết 1 payment theo Id
+   */
   getPaymentById: async (paymentId) => {
     return await axiosInstance.get(`/api/payments/${paymentId}`);
   },
 
-  // Tạo thanh toán mới
-  createPayment: async (paymentData) => {
-    return await axiosInstance.post('/api/payments', paymentData);
+  /**
+   * Lấy các kỳ phí sắp tới trong 30 ngày
+   * -> /api/payments/upcoming
+   */
+  getUpcomingPayments: async () => {
+    return await axiosInstance.get("/api/payments/upcoming");
   },
 
-  // Thanh toán phí bảo hiểm
-  payPremium: async (policyId, paymentData) => {
-    return await axiosInstance.post(`/api/payments/premium/${policyId}`, paymentData);
+  /**
+   * Lịch sử thanh toán (Paid + Failed)
+   * -> /api/payments/history
+   */
+  getPaymentHistory: async () => {
+    return await axiosInstance.get("/api/payments/history");
   },
 
-  // Xác nhận thanh toán
-  confirmPayment: async (paymentId, confirmationData) => {
-    return await axiosInstance.post(`/api/payments/${paymentId}/confirm`, confirmationData);
-  },
-
-  // Hủy thanh toán
-  cancelPayment: async (paymentId) => {
-    return await axiosInstance.post(`/api/payments/${paymentId}/cancel`);
-  },
-
-  // Lấy các phương thức thanh toán
-  getPaymentMethods: async () => {
-    return await axiosInstance.get('/api/payments/methods');
-  },
-
-  // Thêm phương thức thanh toán
-  addPaymentMethod: async (methodData) => {
-    return await axiosInstance.post('/api/payments/methods', methodData);
-  },
-
-  // Xóa phương thức thanh toán
-  deletePaymentMethod: async (methodId) => {
-    return await axiosInstance.delete(`/api/payments/methods/${methodId}`);
-  },
-
-  // Lấy lịch sử giao dịch
-  getTransactionHistory: async (params = {}) => {
-    return await axiosInstance.get('/api/payments/history', { params });
-  },
-
-  // Download hóa đơn
-  downloadInvoice: async (paymentId) => {
-    return await axiosInstance.get(`/api/payments/${paymentId}/invoice`, {
-      responseType: 'blob',
+  /**
+   * Customer thực hiện thanh toán cho 1 kỳ phí
+   * Map vào MakePaymentRequest ở backend:
+   *
+   * public class MakePaymentRequest {
+   *   public int PaymentId { get; set; }
+   *   public string PaymentMethod { get; set; }
+   *   public string? TransactionId { get; set; }
+   *   public string? Notes { get; set; }
+   * }
+   */
+  makePayment: async ({ paymentId, paymentMethod, transactionId, notes }) => {
+    return await axiosInstance.post("/api/payments/make-payment", {
+      PaymentId: paymentId,
+      PaymentMethod: paymentMethod,
+      TransactionId: transactionId,
+      Notes: notes,
     });
-  },
-
-  // Tính toán phí thanh toán
-  calculateFees: async (amount, method) => {
-    return await axiosInstance.post('/api/payments/calculate-fees', { amount, method });
   },
 };
 
