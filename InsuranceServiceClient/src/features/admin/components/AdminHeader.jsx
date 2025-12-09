@@ -1,24 +1,46 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Menu, Bell, Search, User, LogOut, Settings } from 'lucide-react';
-import { useAuth } from '../../../core/contexts/AuthContext';
+// src/features/admin/components/AdminHeader.jsx
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { Menu, Bell, Search, User, LogOut, Settings } from "lucide-react";
+import { useAdminAuth } from "../AdminAuthContext";
 
 export function AdminHeader({ sidebarOpen, onToggleSidebar }) {
   const [showNotifications, setShowNotifications] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
-  const { logout, user } = useAuth();
+
+  // Dùng admin auth thay vì auth của customer
+  const { admin, logout: adminLogout } = useAdminAuth();
   const navigate = useNavigate();
 
   const handleLogout = () => {
-    logout();
-    navigate('/admin/login');
+    adminLogout();
+    navigate("/admin/login");
   };
 
   const notifications = [
-    { id: 1, text: 'Yêu cầu bồi thường mới từ Nguyễn Văn A', time: '5 phút trước', unread: true },
-    { id: 2, text: 'Thanh toán đã được xác nhận', time: '1 giờ trước', unread: true },
-    { id: 3, text: 'Chính sách mới đã được thêm', time: '2 giờ trước', unread: false },
+    {
+      id: 1,
+      text: "Yêu cầu bồi thường mới từ Nguyễn Văn A",
+      time: "5 phút trước",
+      unread: true,
+    },
+    {
+      id: 2,
+      text: "Thanh toán đã được xác nhận",
+      time: "1 giờ trước",
+      unread: true,
+    },
+    {
+      id: 3,
+      text: "Chính sách mới đã được thêm",
+      time: "2 giờ trước",
+      unread: false,
+    },
   ];
+
+  const displayName =
+    admin?.fullName || admin?.userName || admin?.name || "Admin User";
+  const displayEmail = admin?.email || "admin@insurance.vn";
 
   return (
     <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 sticky top-0 z-20">
@@ -57,13 +79,13 @@ export function AdminHeader({ sidebarOpen, onToggleSidebar }) {
           {showNotifications && (
             <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-xl border border-gray-200 py-2">
               <div className="px-4 py-2 border-b border-gray-200">
-                <h3>Thông Báo</h3>
+                <h3 className="font-semibold text-sm">Thông Báo</h3>
               </div>
               {notifications.map((notif) => (
                 <div
                   key={notif.id}
                   className={`px-4 py-3 hover:bg-gray-50 cursor-pointer ${
-                    notif.unread ? 'bg-blue-50' : ''
+                    notif.unread ? "bg-blue-50" : ""
                   }`}
                 >
                   <p className="text-sm text-gray-800">{notif.text}</p>
@@ -92,22 +114,22 @@ export function AdminHeader({ sidebarOpen, onToggleSidebar }) {
               <User className="w-5 h-5 text-white" />
             </div>
             <div className="text-left hidden md:block">
-              <p className="text-sm text-gray-800">{user?.name || 'Admin User'}</p>
-              <p className="text-xs text-gray-500">{user?.email || 'admin@insurance.vn'}</p>
+              <p className="text-sm text-gray-800">{displayName}</p>
+              <p className="text-xs text-gray-500">{displayEmail}</p>
             </div>
           </button>
 
           {showProfile && (
             <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-xl border border-gray-200 py-2">
               <div className="px-4 py-3 border-b border-gray-200">
-                <p className="text-sm text-gray-800">{user?.name || 'Admin User'}</p>
-                <p className="text-xs text-gray-500">{user?.email || 'admin@insurance.vn'}</p>
+                <p className="text-sm text-gray-800">{displayName}</p>
+                <p className="text-xs text-gray-500">{displayEmail}</p>
               </div>
               <button className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-3">
                 <Settings className="w-4 h-4" />
                 Cài đặt tài khoản
               </button>
-              <button 
+              <button
                 onClick={handleLogout}
                 className="w-full px-4 py-2 text-left text-sm hover:bg-red-50 flex items-center gap-3 text-red-600 transition-colors"
               >

@@ -1,6 +1,6 @@
 using InsuranceServiceServer.Core.Data;
 using InsuranceServiceServer.Core.Exceptions;
-using InsuranceServiceServer.Models.Insurance;
+// using InsuranceServiceServer.Models.Insurance;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -184,7 +184,25 @@ namespace InsuranceServiceServer.Features.Customer.Controllers
                 payment.PaymentMethod = request.PaymentMethod;
                 payment.TransactionId = request.TransactionId ?? $"TXN-{DateTime.UtcNow:yyyyMMddHHmmss}";
                 payment.PaymentNote = request.Notes;
+                var policy = payment.Policy;
+if (policy != null && policy.Status == "Pending")
+{
+    // Kiểm tra xem đã có payment nào khác "Paid" chưa
+    var hasOtherPaid = await _context.Payments
+        .AnyAsync(p =>
+            p.PolicyId == policy.Id &&
+            p.Status == "Paid" &&
+            p.Id != payment.Id);
 
+    if (!hasOtherPaid)
+    {
+        policy.Status = "Active";
+        if (policy.ApprovalDate == null)
+        {
+            policy.ApprovalDate = DateTime.UtcNow;
+        }
+    }
+}
                 await _context.SaveChangesAsync();
 
                 return Ok(new
@@ -368,88 +386,94 @@ namespace InsuranceServiceServer.Features.Customer.Controllers
         /// Process/confirm a pending payment (Admin)
         /// </summary>
         [HttpPost]
-        [Route("{id}/confirm")]
-        [Authorize(Roles = "Admin,Manager,Officer")]
-        public async Task<IActionResult> ConfirmPayment(int id, [FromBody] ConfirmPaymentRequest request)
+[Route("{id}/confirm")]
+[Authorize(Roles = "Admin,Manager,Officer")]
+public async Task<IActionResult> ConfirmPayment(int id, [FromBody] ConfirmPaymentRequest request)
+{
+    try
+    {
+        var payment = await _context.Payments.FindAsync(id);
+        if (payment == null)
         {
-            try
-            {
-                var payment = await _context.Payments.FindAsync(id);
-                if (payment == null)
-                {
-                    throw new NotFoundException($"Payment with ID {id} not found");
-                }
-
-                payment.Status = "Completed";
-                payment.PaymentDate = DateTime.UtcNow;
-                payment.TransactionId = request.TransactionId ?? payment.TransactionId;
-                payment.PaymentNote = request.Notes;
-
-                await _context.SaveChangesAsync();
-
-                return Ok(new
-                {
-                    success = true,
-                    message = "Payment confirmed successfully",
-                    payment = new
-                    {
-                        payment.Id,
-                        payment.TransactionId,
-                        payment.Status,
-                        payment.PaymentDate
-                    }
-                });
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, $"Error confirming payment {id}");
-                throw;
-            }
+            throw new NotFoundException($"Payment with ID {id} not found");
         }
+
+        if (payment.Status != "Pending")
+        {
+            throw new ValidationException("Only pending payments can be confirmed");
+        }
+
+        payment.Status = "Paid"; // ✅ thống nhất với Payment.cs
+        payment.PaymentDate = DateTime.UtcNow;
+        payment.TransactionId = request.TransactionId ?? payment.TransactionId;
+        payment.PaymentNote = request.Notes;
+
+        await _context.SaveChangesAsync();
+
+        return Ok(new
+        {
+            success = true,
+            message = "Payment confirmed successfully",
+            payment = new
+            {
+                payment.Id,
+                payment.TransactionId,
+                payment.Status,
+                payment.PaymentDate
+            }
+        });
+    }
+    catch (Exception ex)
+    {
+        _logger.LogError(ex, $"Error confirming payment {id}");
+        throw;
+    }
+}
+
 
         /// <summary>
         /// Refund a payment (Admin)
         /// </summary>
         [HttpPost]
-        [Route("{id}/refund")]
-        [Authorize(Roles = "Admin,Manager")]
-        public async Task<IActionResult> RefundPayment(int id, [FromBody] RefundPaymentRequest request)
+[Route("{id}/refund")]
+[Authorize(Roles = "Admin,Manager")]
+public async Task<IActionResult> RefundPayment(int id, [FromBody] RefundPaymentRequest request)
+{
+    try
+    {
+        var payment = await _context.Payments.FindAsync(id);
+        if (payment == null)
         {
-            try
-            {
-                var payment = await _context.Payments.FindAsync(id);
-                if (payment == null)
-                {
-                    throw new NotFoundException($"Payment with ID {id} not found");
-                }
-
-                if (payment.Status != "Completed")
-                {
-                    throw new ValidationException("Only completed payments can be refunded");
-                }
-
-                payment.Status = "Refunded";
-                payment.PaymentNote = $"Refunded: {request.Reason}. {payment.PaymentNote}";
-
-                await _context.SaveChangesAsync();
-
-                return Ok(new
-                {
-                    success = true,
-                    message = "Payment refunded successfully",
-                    payment = new
-                    {
-                        payment.Id,
-                        payment.Status
-                    }
-                });
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, $"Error refunding payment {id}");
-                throw;
-            }
+            throw new NotFoundException($"Payment with ID {id} not found");
         }
+
+        if (payment.Status != "Paid")
+        {
+            throw new ValidationException("Only paid payments can be refunded");
+        }
+
+        payment.Status = "Refunded";
+        payment.PaymentNote = $"Refunded: {request.Reason}. {payment.PaymentNote}";
+
+        await _context.SaveChangesAsync();
+
+        return Ok(new
+        {
+            success = true,
+            message = "Payment refunded successfully",
+            payment = new
+            {
+                payment.Id,
+                payment.Status
+            }
+        });
+    }
+    catch (Exception ex)
+    {
+        _logger.LogError(ex, $"Error refunding payment {id}");
+        throw;
+    }
+}
     }
 
     public class ConfirmPaymentRequest

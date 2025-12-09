@@ -48,6 +48,8 @@ import { ProtectedRoute } from './features/shared/components/ProtectedRoute';
 import { AdminLogin } from './features/admin/AdminLogin';
 import { AdminDashboard } from './features/admin';
 import { AdminProtectedRoute } from './features/admin/AdminProtectedRoute';
+import ManagerApplications from './features/manager/pages/ManagerApplications';
+
 
 // Tạo QueryClient instance với cấu hình mặc định
 const queryClient = new QueryClient({
@@ -264,6 +266,16 @@ export default function App() {
                       element={
                         <AdminProtectedRoute>
                           <AdminDashboard />
+                        </AdminProtectedRoute>
+                      }
+                    />
+
+                    {/* Manager Routes */}
+                    <Route
+                      path="/manager/applications"
+                      element={
+                        <AdminProtectedRoute>
+                          <ManagerApplications />
                         </AdminProtectedRoute>
                       }
                     />

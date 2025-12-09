@@ -1,39 +1,39 @@
-import { useState } from 'react';
-import { AdminSidebar } from './components/AdminSidebar';
-import { AdminHeader } from './components/AdminHeader';
-import { Overview } from './pages/Overview';
-import { UsersManagement } from './pages/UsersManagement';
-import { PoliciesManagement } from './pages/PoliciesManagement';
-import { ClaimsManagement } from './pages/ClaimsManagement';
-import { AgentsManagement } from './pages/AgentsManagement';
-import { PaymentsManagement } from './pages/PaymentsManagement';
-import { Analytics } from './pages/Analytics';
-import { Settings } from './pages/Settings';
-import { ApplicationsManagement } from './pages/ApplicationsManagement';
+import { useState } from "react";
+import { AdminSidebar } from "./components/AdminSidebar";
+import { AdminHeader } from "./components/AdminHeader";
+import { Overview } from "./pages/Overview";
+import { UsersManagement } from "./pages/UsersManagement";
+import { PoliciesManagement } from "./pages/PoliciesManagement";
+import { ClaimsManagement } from "./pages/ClaimsManagement";
+import { AgentsManagement } from "./pages/AgentsManagement";
+import { PaymentsManagement } from "./pages/PaymentsManagement";
+import { Analytics } from "./pages/Analytics";
+import { Settings } from "./pages/Settings";
+import { ApplicationsManagement } from "./pages/ApplicationsManagement";
 
 export default function AdminDashboard() {
-  const [currentPage, setCurrentPage] = useState('overview');
+  const [currentPage, setCurrentPage] = useState("overview");
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
   const renderPage = () => {
     switch (currentPage) {
-      case 'overview':
+      case "overview":
         return <Overview />;
-      case 'users':
+      case "users":
         return <UsersManagement />;
-      case 'applications':
+      case "applications":
         return <ApplicationsManagement />;
-      case 'policies':
+      case "policies":
         return <PoliciesManagement />;
-      case 'claims':
+      case "claims":
         return <ClaimsManagement />;
-      case 'agents':
+      case "agents":
         return <AgentsManagement />;
-      case 'payments':
+      case "payments":
         return <PaymentsManagement />;
-      case 'analytics':
+      case "analytics":
         return <Analytics />;
-      case 'settings':
+      case "settings":
         return <Settings />;
       default:
         return <Overview />;
@@ -53,7 +53,7 @@ export default function AdminDashboard() {
       {/* Main Content */}
       <div
         className={`flex-1 flex flex-col transition-all duration-300 ${
-          sidebarOpen ? 'ml-64' : 'ml-20'
+          sidebarOpen ? "ml-64" : "ml-20"
         }`}
       >
         <AdminHeader
@@ -62,9 +62,7 @@ export default function AdminDashboard() {
         />
 
         <main className="flex-1 overflow-y-auto p-6">
-          <div className="max-w-7xl mx-auto">
-            {renderPage()}
-          </div>
+          <div className="max-w-7xl mx-auto">{renderPage()}</div>
         </main>
       </div>
     </div>

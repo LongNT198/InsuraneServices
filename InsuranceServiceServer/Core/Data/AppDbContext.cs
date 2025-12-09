@@ -29,6 +29,7 @@ namespace InsuranceServiceServer.Core.Data
         public DbSet<FinancialDocument> FinancialDocuments { get; set; }
 
         // Insurance Business
+<<<<<<< HEAD
         public DbSet<InsuranceProduct> InsuranceProducts { get; set; }
         public DbSet<InsurancePlan> InsurancePlans { get; set; } // Fixed plans for each product
         public DbSet<MedicalInsurancePlan> MedicalInsurancePlans { get; set; } // Medical insurance specific plans
@@ -37,21 +38,33 @@ namespace InsuranceServiceServer.Core.Data
         public DbSet<Payment> Payments { get; set; }
         public DbSet<PolicyLoan> PolicyLoans { get; set; }
         public DbSet<Application> Applications { get; set; }
+=======
+public DbSet<InsuranceProduct> InsuranceProducts { get; set; }
+public DbSet<InsurancePlan> InsurancePlans { get; set; } // Fixed plans for each product
+public DbSet<InsurancePolicy> InsurancePolicies { get; set; }
+public DbSet<InsuranceClaim> InsuranceClaims { get; set; }
+public DbSet<Payment> Payments { get; set; }
+public DbSet<PolicyLoan> PolicyLoans { get; set; }
+public DbSet<Application> Applications { get; set; }
+>>>>>>> origin/dev/Dung
 
-        // Application-specific data (normalized)
-        public DbSet<Beneficiary> Beneficiaries { get; set; }
-        public DbSet<VehicleInfo> VehicleInfos { get; set; }
-        public DbSet<PropertyInfo> PropertyInfos { get; set; }
-        public DbSet<TravelInfo> TravelInfos { get; set; }
+// Application-specific data (normalized)
+public DbSet<Beneficiary> Beneficiaries { get; set; }
+public DbSet<VehicleInfo> VehicleInfos { get; set; }
+public DbSet<PropertyInfo> PropertyInfos { get; set; }
+public DbSet<TravelInfo> TravelInfos { get; set; }
 
-        // Registration Flow
-        public DbSet<RegistrationSession> RegistrationSessions { get; set; }
-        public DbSet<KYCVerification> KYCVerifications { get; set; }
-        public DbSet<HealthDeclaration> HealthDeclarations { get; set; }
-        public DbSet<UnderwritingDecision> UnderwritingDecisions { get; set; }
+// Registration Flow
+public DbSet<RegistrationSession> RegistrationSessions { get; set; }
+public DbSet<KYCVerification> KYCVerifications { get; set; }
+public DbSet<HealthDeclaration> HealthDeclarations { get; set; }
+public DbSet<UnderwritingDecision> UnderwritingDecisions { get; set; }
 
-        // Application Drafts
-        public DbSet<ApplicationDraft> ApplicationDrafts { get; set; }
+// Application Drafts
+public DbSet<ApplicationDraft> ApplicationDrafts { get; set; }
+
+        public DbSet<Payment> Payment { get; set; } = default!;
+
 
         public AppDbContext(DbContextOptions options) : base(options)
         {

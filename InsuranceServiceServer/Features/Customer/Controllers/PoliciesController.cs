@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
+using InsuranceServiceServer.Features.Customer.Models;
 
 namespace InsuranceServiceServer.Features.Customer.Controllers
 {
@@ -189,67 +190,180 @@ namespace InsuranceServiceServer.Features.Customer.Controllers
                 return StatusCode(500, new { success = false, message = "Failed to fetch policies", error = ex.Message });
             }
         }
+/// <summary>
+/// Get all policies for current user
+/// </summary>
+[HttpGet]
+[Route("my-policies")]
+public async Task<IActionResult> GetMyPolicies()
+{
+    // KHÔNG dùng throw InternalServerException nữa để tránh 500
+    try
+    {
+        // 1. Lấy userId từ token
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrEmpty(userId))
+        {
+            // Trả 401 nếu chưa đăng nhập
+            _logger.LogWarning("GetMyPolicies: User not authenticated");
+            return Unauthorized(new
+            {
+                success = false,
+                message = "User not authenticated"
+            });
+        }
+
+        // 2. Tìm customer profile theo user hiện tại
+        var customerProfile = await _context.CustomerProfiles
+            .FirstOrDefaultAsync(c => c.UserId == userId);
+
+        // Nếu chưa có profile -> trả về rỗng, KHÔNG lỗi
+        if (customerProfile == null)
+        {
+            _logger.LogInformation("GetMyPolicies: No customer profile for user {UserId}", userId);
+            return Ok(new
+            {
+                success = true,
+                policies = new List<object>()
+            });
+        }
+
+        // 3. Lấy danh sách policy của customer đó từ DB
+        var policyEntities = await _context.InsurancePolicies
+            .Include(p => p.Product) // chỉ include Product
+            .Where(p => p.CustomerProfileId == customerProfile.Id)
+            .OrderByDescending(p => p.ApplicationDate)
+            .AsNoTracking()
+            .ToListAsync();
+
+        // 4. Map sang object trả về (làm trong C#, không dính EF nữa)
+        var policies = policyEntities.Select(p => new
+        {
+            p.Id,
+            p.PolicyNumber,
+            p.Status,
+            p.CoverageAmount,
+            p.Premium,
+            p.PaymentFrequency,
+            p.StartDate,
+            p.EndDate,
+            p.ApplicationDate,
+            p.ApprovalDate,
+
+            Product = p.Product == null ? null : new
+            {
+                Name = p.Product.ProductName,
+                Type = p.Product.ProductType,
+                Description = p.Product.Description
+            }
+
+            // Tạm thời KHÔNG có NextPayment để tránh lỗi liên quan Payments
+        }).ToList();
+
+        return Ok(new
+        {
+            success = true,
+            policies
+        });
+    }
+    catch (Exception ex)
+    {
+        // Ghi log chi tiết để sau này debug
+        _logger.LogError(ex, "GetMyPolicies: unexpected error");
+
+        // Trả về 200 nhưng success = false để FE không bị 500
+        return Ok(new
+        {
+            success = false,
+            message = "Failed to retrieve policies due to internal error",
+            policies = new List<object>()
+        });
+    }
+}
+
+
 
         /// <summary>
-        /// Get all policies for current user
-        /// </summary>
-        [HttpGet]
-        [Route("my-policies")]
-        public async Task<IActionResult> GetMyPolicies()
-        {
-            try
-            {
-                var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-                if (string.IsNullOrEmpty(userId))
-                {
-                    throw new UnauthorizedException("User not authenticated");
-                }
+/// <summary>
+/// Get all policies for current user (kèm theo kỳ thanh toán kế tiếp nếu có)
+/// </summary>
+// [HttpGet]
+// [Route("my-policies")]
+// public async Task<IActionResult> GetMyPolicies()
+// {
+//     try
+//     {
+//         var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+//         if (string.IsNullOrEmpty(userId))
+//         {
+//             throw new UnauthorizedException("User not authenticated");
+//         }
 
-                // Find customer profile
-                var customerProfile = await _context.CustomerProfiles
-                    .FirstOrDefaultAsync(c => c.UserId == userId);
+//         // Find customer profile
+//         var customerProfile = await _context.CustomerProfiles
+//             .FirstOrDefaultAsync(c => c.UserId == userId);
 
-                if (customerProfile == null)
-                {
-                    return Ok(new { policies = new List<object>() });
-                }
+//         if (customerProfile == null)
+//         {
+//             // Quan trọng: vẫn trả success = true nhưng mảng rỗng
+//             return Ok(new { success = true, policies = new List<object>() });
+//         }
 
-                var policies = await _context.InsurancePolicies
-                    .Include(p => p.Product)
-                    .Where(p => p.CustomerProfileId == customerProfile.Id)
-                    .OrderByDescending(p => p.ApplicationDate)
-                    .Select(p => new
-                    {
-                        p.Id,
-                        p.PolicyNumber,
-                        p.Status,
-                        p.CoverageAmount,
-                        p.Premium,
-                        p.PaymentFrequency,
-                    p.StartDate,
-                    p.EndDate,
-                    p.ApplicationDate,
-                    p.ApprovalDate,
-                    Product = new
-                    {
-                        Name = p.Product!.ProductName,
-                        Type = p.Product.ProductType,
-                        p.Product.Description
-                    }
-                })
-                .ToListAsync();                return Ok(new { success = true, policies });
-            }
-            catch (UnauthorizedException ex)
-            {
-                _logger.LogWarning($"Unauthorized access: {ex.Message}");
-                throw;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError($"Error getting policies: {ex.Message}");
-                throw new InternalServerException("Failed to retrieve policies");
-            }
-        }
+//         var policies = await _context.InsurancePolicies
+//             .Include(p => p.Product)
+//             .Include(p => p.Payments) // 👉 thêm dòng này
+//             .Where(p => p.CustomerProfileId == customerProfile.Id)
+//             .OrderByDescending(p => p.ApplicationDate)
+//             .Select(p => new
+//             {
+//                 p.Id,
+//                 p.PolicyNumber,
+//                 p.Status,
+//                 p.CoverageAmount,
+//                 p.Premium,
+//                 p.PaymentFrequency,
+//                 p.TermYears,
+//                 p.StartDate,
+//                 p.EndDate,
+//                 p.ApplicationDate,
+//                 p.ApprovalDate,
+//                 Product = new
+//                 {
+//                     Name = p.Product!.ProductName,
+//                     Type = p.Product.ProductType,
+//                     p.Product.Description
+//                 },
+//                 // 👇 lấy payment Pending sớm nhất làm NextPayment
+//                 NextPayment = p.Payments
+//                     .Where(x => x.Status == "Pending")
+//                     .OrderBy(x => x.DueDate)
+//                     .Select(x => new
+//                     {
+//                         x.Id,
+//                         x.Amount,
+//                         x.Status,
+//                         x.DueDate
+//                     })
+//                     .FirstOrDefault()
+//             })
+//             .ToListAsync();
+
+//         return Ok(new { success = true, policies });
+//     }
+//     catch (UnauthorizedException ex)
+//     {
+//         _logger.LogWarning($"Unauthorized access: {ex.Message}");
+//         throw;
+//     }
+//     catch (Exception ex)
+//     {
+//         _logger.LogError($"Error getting policies: {ex.Message}");
+//         throw new InternalServerException("Failed to retrieve policies");
+//     }
+// }
+
+
+
 
         /// <summary>
         /// Get policy details by ID
@@ -319,12 +433,21 @@ namespace InsuranceServiceServer.Features.Customer.Controllers
                         policy.Customer.Address
                     },
                     PaymentSummary = new
-                    {
-                        TotalPaid = policy.Payments.Where(p => p.Status == "Completed").Sum(p => p.Amount),
-                        PendingPayments = policy.Payments.Count(p => p.Status == "Pending"),
-                        LastPaymentDate = policy.Payments.Where(p => p.Status == "Completed")
-                            .OrderByDescending(p => p.PaymentDate).FirstOrDefault()?.PaymentDate
-                    },
+{
+    TotalPaid = policy.Payments
+        .Where(p => p.Status == "Paid")
+        .Sum(p => p.Amount),
+
+    PendingPayments = policy.Payments
+        .Count(p => p.Status == "Pending"),
+
+    LastPaymentDate = policy.Payments
+        .Where(p => p.Status == "Paid")
+        .OrderByDescending(p => p.PaymentDate)
+        .FirstOrDefault()
+        ?.PaymentDate
+},
+
                     ClaimsSummary = new
                     {
                         TotalClaims = policy.Claims.Count,
