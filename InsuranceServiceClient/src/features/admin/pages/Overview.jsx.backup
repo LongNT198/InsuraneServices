@@ -1,0 +1,214 @@
+import { 
+  Users, 
+  FileText, 
+  DollarSign, 
+  TrendingUp, 
+  ArrowUp, 
+  ArrowDown,
+  Clock,
+  CheckCircle,
+  XCircle
+} from 'lucide-react';
+import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+
+const stats = [
+  { 
+    title: 'Tổng Người Dùng', 
+    value: '12,458', 
+    change: '+12.5%', 
+    trend: 'up', 
+    icon: Users,
+    color: 'bg-blue-500'
+  },
+  { 
+    title: 'Chính Sách Hoạt Động', 
+    value: '3,842', 
+    change: '+8.2%', 
+    trend: 'up', 
+    icon: FileText,
+    color: 'bg-green-500'
+  },
+  { 
+    title: 'Doanh Thu Tháng Này', 
+    value: '2.4B VNĐ', 
+    change: '+23.1%', 
+    trend: 'up', 
+    icon: DollarSign,
+    color: 'bg-purple-500'
+  },
+  { 
+    title: 'Tỷ Lệ Tăng Trưởng', 
+    value: '18.6%', 
+    change: '-2.4%', 
+    trend: 'down', 
+    icon: TrendingUp,
+    color: 'bg-orange-500'
+  },
+];
+
+const revenueData = [
+  { month: 'T1', revenue: 1.2, policies: 280 },
+  { month: 'T2', revenue: 1.5, policies: 320 },
+  { month: 'T3', revenue: 1.8, policies: 380 },
+  { month: 'T4', revenue: 1.6, policies: 340 },
+  { month: 'T5', revenue: 2.1, policies: 420 },
+  { month: 'T6', revenue: 2.4, policies: 480 },
+];
+
+const policyTypeData = [
+  { name: 'Nhân Thọ', value: 45, color: '#3b82f6' },
+  { name: 'Y Tế', value: 30, color: '#10b981' },
+  { name: 'Xe Cộ', value: 15, color: '#f59e0b' },
+  { name: 'Nhà Ở', value: 10, color: '#8b5cf6' },
+];
+
+const recentClaims = [
+  { id: 'CLM-001', user: 'Nguyễn Văn A', type: 'Y Tế', amount: '25,000,000 VNĐ', status: 'pending', date: '2025-12-01' },
+  { id: 'CLM-002', user: 'Trần Thị B', type: 'Xe Cộ', amount: '15,000,000 VNĐ', status: 'approved', date: '2025-11-30' },
+  { id: 'CLM-003', user: 'Lê Văn C', type: 'Nhân Thọ', amount: '50,000,000 VNĐ', status: 'pending', date: '2025-11-29' },
+  { id: 'CLM-004', user: 'Phạm Thị D', type: 'Nhà Ở', amount: '30,000,000 VNĐ', status: 'rejected', date: '2025-11-28' },
+  { id: 'CLM-005', user: 'Hoàng Văn E', type: 'Y Tế', amount: '12,000,000 VNĐ', status: 'approved', date: '2025-11-27' },
+];
+
+export function Overview() {
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div>
+        <h1 className="text-gray-900 mb-2">Dashboard Tổng Quan</h1>
+        <p className="text-gray-600">Chào mừng trở lại! Đây là tổng quan về hệ thống bảo hiểm của bạn.</p>
+      </div>
+
+      {/* Stats Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {stats.map((stat) => {
+          const Icon = stat.icon;
+          return (
+            <div key={stat.title} className="bg-white rounded-xl p-6 border border-gray-200 hover:shadow-lg transition-shadow">
+              <div className="flex items-start justify-between mb-4">
+                <div className={`${stat.color} w-12 h-12 rounded-lg flex items-center justify-center`}>
+                  <Icon className="w-6 h-6 text-white" />
+                </div>
+                <div className={`flex items-center gap-1 text-sm ${
+                  stat.trend === 'up' ? 'text-green-600' : 'text-red-600'
+                }`}>
+                  {stat.trend === 'up' ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />}
+                  {stat.change}
+                </div>
+              </div>
+              <h3 className="text-gray-900 mb-1">{stat.value}</h3>
+              <p className="text-sm text-gray-600">{stat.title}</p>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Charts Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Revenue Chart */}
+        <div className="lg:col-span-2 bg-white rounded-xl p-6 border border-gray-200">
+          <h2 className="text-gray-900 mb-6">Doanh Thu & Chính Sách (6 Tháng)</h2>
+          <ResponsiveContainer width="100%" height={300}>
+            <LineChart data={revenueData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+              <XAxis dataKey="month" stroke="#6b7280" />
+              <YAxis stroke="#6b7280" />
+              <Tooltip />
+              <Legend />
+              <Line 
+                type="monotone" 
+                dataKey="revenue" 
+                stroke="#3b82f6" 
+                strokeWidth={2}
+                name="Doanh Thu (Tỷ VNĐ)"
+              />
+              <Line 
+                type="monotone" 
+                dataKey="policies" 
+                stroke="#10b981" 
+                strokeWidth={2}
+                name="Số Chính Sách"
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* Policy Types Pie Chart */}
+        <div className="bg-white rounded-xl p-6 border border-gray-200">
+          <h2 className="text-gray-900 mb-6">Phân Loại Chính Sách</h2>
+          <ResponsiveContainer width="100%" height={300}>
+            <PieChart>
+              <Pie
+                data={policyTypeData}
+                cx="50%"
+                cy="50%"
+                labelLine={false}
+                label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                outerRadius={80}
+                fill="#8884d8"
+                dataKey="value"
+              >
+                {policyTypeData.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={entry.color} />
+                ))}
+              </Pie>
+              <Tooltip />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* Recent Claims Table */}
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="p-6 border-b border-gray-200">
+          <h2 className="text-gray-900">Yêu Cầu Bồi Thường Gần Đây</h2>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs text-gray-500 uppercase tracking-wider">ID</th>
+                <th className="px-6 py-3 text-left text-xs text-gray-500 uppercase tracking-wider">Người Dùng</th>
+                <th className="px-6 py-3 text-left text-xs text-gray-500 uppercase tracking-wider">Loại</th>
+                <th className="px-6 py-3 text-left text-xs text-gray-500 uppercase tracking-wider">Số Tiền</th>
+                <th className="px-6 py-3 text-left text-xs text-gray-500 uppercase tracking-wider">Trạng Thái</th>
+                <th className="px-6 py-3 text-left text-xs text-gray-500 uppercase tracking-wider">Ngày</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {recentClaims.map((claim) => (
+                <tr key={claim.id} className="hover:bg-gray-50">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{claim.id}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{claim.user}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{claim.type}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{claim.amount}</td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    {claim.status === 'pending' && (
+                      <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs bg-yellow-100 text-yellow-800">
+                        <Clock className="w-3 h-3" />
+                        Đang Xử Lý
+                      </span>
+                    )}
+                    {claim.status === 'approved' && (
+                      <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs bg-green-100 text-green-800">
+                        <CheckCircle className="w-3 h-3" />
+                        Đã Duyệt
+                      </span>
+                    )}
+                    {claim.status === 'rejected' && (
+                      <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs bg-red-100 text-red-800">
+                        <XCircle className="w-3 h-3" />
+                        Từ Chối
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{claim.date}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}

@@ -1,0 +1,67 @@
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Introduction	1
+Project Requirements:	1
+Insurance includes	2
+
+
+
+
+
+
+
+
+
+
+Introduction
+Insurance is a contract for payment of a sum of money to the person assured on the happening of the event insured against. Usually the contract provides for the payment of an amount on the date of maturity or at specified dates at periodic intervals or at unfortunate death, if it occurs earlier. Among other things, the contract also provides for the payment of premium periodically to the Corporation by the assured. Insurance is universally acknowledged to be an institution which eliminates `risk', substituting certainty for uncertainty and comes to the timely aid of the family in the unfortunate event of death of the breadwinner.
+Project Requirements:
+This software provides four types of Insurance services, which includes Life Insurance, medical Insurance, Motor Insurance. Home Insurance,
+
+Presently this project follows Internet mode i.e. the details can be viewed and updated by the officials of the company.
+Online Insurance Service has the following features:-
+1). A User can view the details of various policies and schemes offered by the Insurance Company. 
+2).New Users can register with the site so that he can get information online.
+3).An existing policyholder can view his policy details and calculate the premium.
+4).The web site provides information about the new strategies and subsidiary
+schemes of the company. 
+5).Provides loan facility for policyholders and online payments.
+Calculation of the premium is to be done Term plan taken by the person.
+
+
+
+
+
+Insurance includes
+Life Insurance: Life insurance is a plan which provides protection to the insured and his family with financial coverage in case of any mishaps. To avail the benefits of life insurance policy, the policy holder has to pay a monthly premium to the insurer for a certain period of time.
+Medical Insurance: Under this type of health care cover, medical expenses are covered. When an insured person needs medical treatment due to illness or accident, the insurance agent provides coverage for his expenses such as doctor fees, hospital fees, medicine cost and other related bills.
+Motor insurance: Under this type of plan which provides protection against  the auto-mobile the user owns.
+Home Insurance: The most popular among the 6 types of insurance is the home insurance that provides compensation for any mishaps that occurs on your home. Coverage is provided according to the policy and premium paid by the homeowner. There are various types of home insurance plans that you can choose from to suit your needs.
+
+
+Insurance-services
+
+
+
+
+1
+
+
