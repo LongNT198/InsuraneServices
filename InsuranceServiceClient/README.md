@@ -1,7 +1,4 @@
-
-  # Online Insurance Service Platform
-
-  This is a code bundle for Online Insurance Service Platform. The original project is available at https://www.figma.com/design/xfVrkBB3iZpdHc5UsgreGB/Online-Insurance-Service-Platform.
+Insurance Service
 
   ## Running the code
 

@@ -2,13 +2,13 @@ import { useState, useEffect } from 'react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Link } from 'react-router-dom';
-import { Heart, Shield, TrendingUp, Users, CheckCircle, ArrowRight, AlertCircle, Activity, Hospital, Ambulance, Stethoscope } from 'lucide-react';
+import { Heart, Shield, TrendingUp, Users, CheckCircle, ArrowRight, AlertCircle, Activity, Hospital, Ambulance, Stethoscope, Calculator } from 'lucide-react';
 import { Badge } from './ui/badge';
 import axios from '../api/axios';
 import { ComparisonTable } from './insurance/ComparisonTable';
 import { PremiumCalculator } from './insurance/PremiumCalculator';
 import { FAQSection } from './insurance/FAQSection';
-import { MiniCalculator } from './insurance/MiniCalculator';
+// import { MiniCalculator } from './insurance/MiniCalculator';
 import plansService from '../api/services/plansService';
 
 export function MedicalInsurance() {
@@ -19,12 +19,9 @@ export function MedicalInsurance() {
   useEffect(() => {
     const loadProducts = async () => {
       try {
-        console.log('🔄 Loading Medical Insurance products...');
         const response = await axios.get('/api/products');
-        console.log('📦 API Response:', response);
         const allProducts = response.data || [];
         const medicalProducts = allProducts.filter(p => p.productType === 'Health');
-        console.log('🏥 Medical products:', medicalProducts.length, medicalProducts);
         setProducts(medicalProducts);
 
         // Load plans for each product
@@ -225,21 +222,26 @@ export function MedicalInsurance() {
                           ) : (
                             <div className="space-y-2">
                               {plans.map((plan) => {
-                                const monthlyPremium = plan.basePremiumMonthly || (plan.basePremiumAnnual / 12);
                                 const annualPremium = plan.basePremiumAnnual;
                                 return (
-                                  <div key={plan.id} className="flex items-center justify-between p-2 bg-gray-50 rounded-md">
-                                    <div className="flex items-center gap-2">
-                                      <span className="text-sm font-medium">{plan.planName}</span>
-                                      {plan.isFeatured && <Badge variant="default" className="text-xs">Featured</Badge>}
-                                      {plan.isPopular && <Badge variant="secondary" className="text-xs">Popular</Badge>}
+                                  <div key={plan.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-transparent hover:border-green-100 hover:bg-green-50/50 transition-all">
+                                    <div className="flex items-center gap-3">
+                                      <div className="bg-white p-1.5 rounded-full shadow-sm border border-gray-100">
+                                        <Shield className="size-4 text-green-600" />
+                                      </div>
+                                      <div>
+                                        <div className="flex items-center gap-2">
+                                          <span className="text-sm font-semibold text-gray-900">{plan.planName}</span>
+                                          {plan.isPopular && <Badge variant="secondary" className="text-[10px] h-5 px-1.5">Popular</Badge>}
+                                        </div>
+                                        <p className="text-xs text-gray-500">
+                                          Coverage: <span className="font-medium text-gray-700">${(plan.coverageAmount || 0).toLocaleString()}</span>
+                                        </p>
+                                      </div>
                                     </div>
                                     <div className="text-right">
-                                      <p className="text-sm font-semibold text-green-600">
-                                        ${Number(monthlyPremium).toFixed(0)}/mo
-                                      </p>
-                                      <p className="text-xs text-gray-500">
-                                        ${Number(annualPremium).toFixed(0)}/yr • ${plan.coverageAmount.toLocaleString()} coverage
+                                      <p className="text-sm font-bold text-green-700">
+                                        ${Number(annualPremium).toLocaleString()}
                                       </p>
                                     </div>
                                   </div>
@@ -260,7 +262,12 @@ export function MedicalInsurance() {
                             </Link>
                           </Button>
                         </div>
-                        <MiniCalculator product={product} productType="Medical" />
+                        <Button className="w-full" variant="outline" asChild>
+                          <Link to={`/medical-insurance/${product.id}#plans`}>
+                            <Calculator className="size-4 mr-2" />
+                            Get Quote
+                          </Link>
+                        </Button>
                       </div>
                     </CardContent>
                   </Card>
@@ -268,7 +275,7 @@ export function MedicalInsurance() {
               })
             )}
           </div>
-          
+
           {/* Comparison Table */}
           {!loading && products.length > 1 && (
             <ComparisonTable products={products} productType="Medical" />

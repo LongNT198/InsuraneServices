@@ -1,309 +1,673 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../../../shared/components/ui/card';
 import { Button } from '../../../../shared/components/ui/button';
 import { Input } from '../../../../shared/components/ui/input';
 import { Label } from '../../../../shared/components/ui/label';
 import { Alert, AlertDescription } from '../../../../shared/components/ui/alert';
-import { Upload, FileText, CheckCircle, AlertCircle, X, ArrowLeft, ArrowRight } from 'lucide-react';
+import { Progress } from '../../../../shared/components/ui/progress';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../../../../shared/components/ui/dialog';
+import { ArrowLeft, ArrowRight, Upload, FileText, CheckCircle, X, AlertCircle, Shield, Heart, FileCheck, Loader2, CloudUpload, Trash2 } from 'lucide-react';
+import { documentService } from '../../../../shared/api/services/documentService';
+import { toast } from 'sonner';
 
-const DOCUMENT_TYPES = [
-  {
-    id: 'id_proof',
-    name: 'ID Proof',
-    description: 'Aadhar Card, PAN Card, Passport, or Driving License',
-    required: true,
-    maxSize: 5 // MB
-  },
-  {
-    id: 'address_proof',
-    name: 'Address Proof',
-    description: 'Utility bill, Bank statement, or Rental agreement',
-    required: true,
-    maxSize: 5
-  },
-  {
-    id: 'age_proof',
-    name: 'Age Proof',
-    description: 'Birth certificate, School certificate, or Passport',
-    required: true,
-    maxSize: 5
-  },
-  {
-    id: 'medical_reports',
-    name: 'Recent Medical Reports',
-    description: 'Blood test, ECG, or any recent medical examination reports (if applicable)',
-    required: false,
-    maxSize: 10
-  },
-  {
-    id: 'prescription',
-    name: 'Prescription (if any)',
-    description: 'Current medications or treatment prescriptions',
-    required: false,
-    maxSize: 5
-  },
-  {
-    id: 'previous_policy',
-    name: 'Previous Health Insurance Policy',
-    description: 'Copy of previous health insurance policy (if applicable)',
-    required: false,
-    maxSize: 5
-  }
-];
+export default function HealthDocumentsStep({ data, onChange, onNext, onBack }) {
+  // Local file selections (chưa upload lên server)
+  const [selectedFiles, setSelectedFiles] = useState({});
 
-export default function HealthDocumentsStep({ data, onNext, onBack }) {
-  const [documents, setDocuments] = useState(data?.documents || {});
-  const [errors, setErrors] = useState({});
-  const [uploading, setUploading] = useState({});
+  // Uploaded documents metadata (đã lên server)
+  const [uploadedDocs, setUploadedDocs] = useState(() => data.documents || {});
 
-  const handleFileSelect = async (docType, event) => {
-    const file = event.target.files[0];
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState({});
+  const [uploadErrors, setUploadErrors] = useState({});
+
+  // Delete confirmation dialog state
+  const [deleteDialog, setDeleteDialog] = useState({
+    open: false,
+    field: null,
+    index: null,
+    fileName: ''
+  });
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  // Check if có file nào đã chọn chưa upload
+  const hasUnuploadedFiles = useMemo(() => {
+    return Object.values(selectedFiles).some(f => f !== null && (Array.isArray(f) ? f.length > 0 : true));
+  }, [selectedFiles]);
+
+  // Count số file đã chọn
+  const selectedCount = useMemo(() => {
+    return Object.entries(selectedFiles).reduce((count, [key, value]) => {
+      if (Array.isArray(value)) return count + value.length;
+      return value ? count + 1 : count;
+    }, 0);
+  }, [selectedFiles]);
+
+  // Determine required documents based on health declaration
+  const requiresHealthDocs = useMemo(() => {
+    const health = data.healthDeclaration || {};
+    const sumInsured = parseFloat(data.productSelection?.sumInsured) || 0;
+    const personalInfo = data.applicant || {};
+
+    let age = 0;
+    if (personalInfo.dateOfBirth) {
+      const birthDate = new Date(personalInfo.dateOfBirth);
+      const today = new Date();
+      age = today.getFullYear() - birthDate.getFullYear();
+      const monthDiff = today.getMonth() - birthDate.getMonth();
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+        age--;
+      }
+    }
+
+    return health.hasMedicalConditions || health.isOnMedication || health.hasHospitalization ||
+      health.hasHeartDisease || health.hasCancer || health.hasDiabetes || 
+      health.smokingStatus !== 'non-smoker' ||
+      age > 45 || sumInsured > 100000 || health.hasOccupationalHazards;
+  }, [data.healthDeclaration, data.productSelection, data.applicant]);
+
+  // Chọn file local (chưa upload)
+  const handleFileSelect = (field, file, isArray = false) => {
     if (!file) return;
 
-    const docConfig = DOCUMENT_TYPES.find(d => d.id === docType);
-    const maxSizeBytes = docConfig.maxSize * 1024 * 1024;
-
     // Validate file size
-    if (file.size > maxSizeBytes) {
-      setErrors(prev => ({
+    const maxSize = 5 * 1024 * 1024; // 5MB
+    if (file.size > maxSize) {
+      setUploadErrors(prev => ({
         ...prev,
-        [docType]: `File size must be less than ${docConfig.maxSize}MB`
+        [field]: `File size exceeds 5MB limit. Current size: ${(file.size / 1024 / 1024).toFixed(2)}MB`
       }));
       return;
     }
 
-    // Validate file type
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf'];
-    if (!allowedTypes.includes(file.type)) {
-      setErrors(prev => ({
+    // Create preview URL for images
+    const fileData = {
+      file: file,
+      name: file.name,
+      size: file.size,
+      type: file.type,
+      previewUrl: file.type.startsWith('image/') ? URL.createObjectURL(file) : null,
+    };
+
+    if (isArray) {
+      setSelectedFiles(prev => ({
         ...prev,
-        [docType]: 'Only JPG, PNG, or PDF files are allowed'
+        [field]: [...(prev[field] || []), fileData],
       }));
-      return;
+    } else {
+      setSelectedFiles(prev => ({
+        ...prev,
+        [field]: fileData,
+      }));
     }
 
-    // Simulate upload
-    setUploading(prev => ({ ...prev, [docType]: true }));
-    setErrors(prev => ({ ...prev, [docType]: '' }));
+    setUploadErrors(prev => ({ ...prev, [field]: null }));
+  };
+
+  // Upload tất cả files lên server
+  const handleUploadAll = async () => {
+    setUploading(true);
+    setUploadErrors({});
+
+    const newUploadedDocs = { ...uploadedDocs };
+    let hasError = false;
 
     try {
-      // In a real application, you would upload to a server here
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      for (const [field, fileData] of Object.entries(selectedFiles)) {
+        if (!fileData) continue;
 
-      // Convert to base64 for storage (in production, you'd store the file path/URL)
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setDocuments(prev => ({
-          ...prev,
-          [docType]: {
-            file: file,
-            name: file.name,
-            size: file.size,
-            type: file.type,
-            uploadedAt: new Date().toISOString()
-            // In production: url: responseFromServer.url
+        // Determine document type for Health Insurance
+        let documentType = 'other';
+        if (field.includes('identity') || field.includes('Security')) {
+          documentType = 'identity';
+        } else if (field.includes('medical') || field.includes('health') || field.includes('lab') || field.includes('prescription') || field.includes('doctor') || field.includes('report')) {
+          documentType = 'health';
+        }
+
+        if (Array.isArray(fileData)) {
+          const uploadedArray = [];
+          for (const item of fileData) {
+            try {
+              setUploadProgress(prev => ({ ...prev, [`${field}_${item.name}`]: 0 }));
+
+              const result = await documentService.uploadDocument(
+                item.file,
+                documentType,
+                field,
+                (progress) => {
+                  setUploadProgress(prev => ({ ...prev, [`${field}_${item.name}`]: progress }));
+                }
+              );
+
+              uploadedArray.push({
+                documentId: result.documentId,
+                fileName: result.fileName,
+                fileUrl: result.fileUrl,
+                fileSize: result.fileSize,
+                fileType: result.fileType,
+                uploadedAt: result.uploadedAt,
+                category: field,
+                originalFile: item.name,
+              });
+            } catch (error) {
+              console.error(`❌ Failed to upload ${item.name}:`, error);
+              setUploadErrors(prev => ({
+                ...prev,
+                [field]: `Failed: ${item.name} - ${error.message}`
+              }));
+              hasError = true;
+            }
           }
-        }));
-        setUploading(prev => ({ ...prev, [docType]: false }));
-      };
-      reader.readAsDataURL(file);
+          if (uploadedArray.length > 0) {
+            newUploadedDocs[field] = [...(newUploadedDocs[field] || []), ...uploadedArray];
+          }
+        } else {
+          try {
+            setUploadProgress(prev => ({ ...prev, [field]: 0 }));
+
+            const result = await documentService.uploadDocument(
+              fileData.file,
+              documentType,
+              field,
+              (progress) => {
+                setUploadProgress(prev => ({ ...prev, [field]: progress }));
+              }
+            );
+
+            newUploadedDocs[field] = {
+              documentId: result.documentId,
+              fileName: result.fileName,
+              fileUrl: result.fileUrl,
+              fileSize: result.fileSize,
+              fileType: result.fileType,
+              uploadedAt: result.uploadedAt,
+              category: field,
+              originalFile: fileData.name,
+            };
+          } catch (error) {
+            console.error(`❌ Failed to upload ${field}:`, error);
+            setUploadErrors(prev => ({
+              ...prev,
+              [field]: error.message || 'Upload failed'
+            }));
+            hasError = true;
+          }
+        }
+      }
+
+      if (!hasError) {
+        setUploadedDocs(newUploadedDocs);
+        onChange({ documents: newUploadedDocs });
+        setSelectedFiles({});
+        toast.success('All documents uploaded successfully');
+        console.log('✅ All documents uploaded successfully');
+      }
     } catch (error) {
-      setErrors(prev => ({
-        ...prev,
-        [docType]: 'Upload failed. Please try again.'
-      }));
-      setUploading(prev => ({ ...prev, [docType]: false }));
+      console.error('❌ Upload error:', error);
+      toast.error('Upload failed. Please try again.');
+    } finally {
+      setUploading(false);
+      setUploadProgress({});
     }
   };
 
-  const handleRemoveFile = (docType) => {
-    setDocuments(prev => {
-      const newDocs = { ...prev };
-      delete newDocs[docType];
-      return newDocs;
-    });
-    setErrors(prev => ({ ...prev, [docType]: '' }));
-  };
-
-  const formatFileSize = (bytes) => {
-    if (bytes < 1024) return bytes + ' B';
-    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
-  };
-
-  const validate = () => {
-    const newErrors = {};
-
-    // Check required documents
-    DOCUMENT_TYPES.forEach(docType => {
-      if (docType.required && !documents[docType.id]) {
-        newErrors[docType.id] = `${docType.name} is required`;
+  const removeSelectedFile = (field, index = null) => {
+    if (index !== null) {
+      setSelectedFiles(prev => ({
+        ...prev,
+        [field]: prev[field].filter((_, i) => i !== index),
+      }));
+    } else {
+      // Revoke preview URL if exists
+      if (selectedFiles[field]?.previewUrl) {
+        URL.revokeObjectURL(selectedFiles[field].previewUrl);
       }
-    });
+      setSelectedFiles(prev => ({
+        ...prev,
+        [field]: null,
+      }));
+    }
+  };
 
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+  const removeUploadedFile = (field, index = null) => {
+    // Get document info for confirmation dialog
+    const docToDelete = index !== null
+      ? uploadedDocs[field][index]
+      : uploadedDocs[field];
+
+    const fileName = docToDelete?.originalFile || docToDelete?.fileName || 'this document';
+
+    // Open confirmation dialog
+    setDeleteDialog({
+      open: true,
+      field,
+      index,
+      fileName
+    });
+  };
+
+  const confirmDelete = async () => {
+    const { field, index } = deleteDialog;
+    setIsDeleting(true);
+
+    try {
+      // Get the document to delete
+      const docToDelete = index !== null
+        ? uploadedDocs[field][index]
+        : uploadedDocs[field];
+
+      // Delete from server if documentId exists
+      const docId = docToDelete?.documentId || docToDelete?.id;
+      if (docId) {
+        console.log(`🗑️ Deleting document from server with ID: ${docId}`);
+        await documentService.deleteDocument(docId);
+        toast.success('Document deleted successfully');
+      } else {
+        toast.info('Document removed from application');
+      }
+
+      // Update local state
+      if (index !== null) {
+        const updated = {
+          ...uploadedDocs,
+          [field]: uploadedDocs[field].filter((_, i) => i !== index),
+        };
+        setUploadedDocs(updated);
+        onChange({ documents: updated });
+      } else {
+        const updated = {
+          ...uploadedDocs,
+          [field]: null,
+        };
+        setUploadedDocs(updated);
+        onChange({ documents: updated });
+      }
+
+      // Close dialog
+      setDeleteDialog({ open: false, field: null, index: null, fileName: '' });
+    } catch (error) {
+      console.error('❌ Failed to delete document:', error);
+      toast.error(`Failed to delete document: ${error.response?.data?.message || error.message}`);
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const handleNext = () => {
-    if (validate()) {
-      onNext({ documents });
-    }
+    onChange({ documents: uploadedDocs });
+    onNext();
   };
 
-  const uploadedCount = Object.keys(documents).length;
-  const requiredCount = DOCUMENT_TYPES.filter(d => d.required).length;
-  const totalCount = DOCUMENT_TYPES.length;
+  // Check if required documents are uploaded
+  const hasRequiredDocs = useMemo(() => {
+    const allRequired =
+      uploadedDocs.identityCardFront &&
+      uploadedDocs.identityCardBack &&
+      uploadedDocs.socialSecurityCard;
+
+    return allRequired;
+  }, [uploadedDocs]);
+
+  const FileUploadBox = ({ id, label, required = false, description }) => {
+    const selectedFile = selectedFiles[id];
+    const uploadedFile = uploadedDocs[id];
+    const progress = uploadProgress[id] || 0;
+    const error = uploadErrors[id];
+    const isUploading = uploading && progress > 0;
+
+    return (
+      <div className="space-y-2">
+        <Label htmlFor={id}>
+          {label} {required && <span className="text-red-500">*</span>}
+          {description && <span className="text-sm text-gray-500 ml-2">{description}</span>}
+        </Label>
+
+        {/* Uploaded file (đã lên server - màu xanh) */}
+        {uploadedFile && (
+          <div className="border-2 border-green-200 rounded-lg p-4 bg-green-50">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-green-700">
+                  <CheckCircle className="w-4 h-4" />
+                  <span className="text-sm font-medium truncate max-w-[200px]">
+                    {uploadedFile.originalFile || uploadedFile.fileName}
+                  </span>
+                  <span className="text-xs text-green-600">({(uploadedFile.fileSize / 1024).toFixed(1)} KB)</span>
+                  <span className="text-xs bg-green-200 text-green-800 px-2 py-0.5 rounded">✓ Uploaded</span>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => removeUploadedFile(id)}
+                  className="h-8"
+                >
+                  <X className="w-4 h-4 text-red-500" />
+                </Button>
+              </div>
+
+              {uploadedFile.fileType?.startsWith('image/') && uploadedFile.fileUrl && (
+                <div className="border rounded overflow-hidden bg-white">
+                  <img
+                    src={`${import.meta.env.VITE_API_URL || 'https://localhost:7001'}${uploadedFile.fileUrl}`}
+                    alt={uploadedFile.fileName}
+                    className="w-full h-48 object-contain"
+                  />
+                </div>
+              )}
+
+              {uploadedFile.fileType === 'application/pdf' && uploadedFile.fileUrl && (
+                <a
+                  href={`${import.meta.env.VITE_API_URL || 'https://localhost:7001'}${uploadedFile.fileUrl}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 text-blue-600 hover:text-blue-800 text-sm"
+                >
+                  <FileText className="w-4 h-4" />
+                  <span>View PDF</span>
+                </a>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Selected file (chưa upload - màu vàng) */}
+        {!uploadedFile && (
+          <div className="border-2 border-dashed rounded-lg p-4 hover:border-blue-500 transition-colors">
+            <Input
+              id={id}
+              type="file"
+              accept=".pdf,.jpg,.jpeg,.png"
+              onChange={(e) => {
+                const file = e.target.files[0];
+                if (file) {
+                  handleFileSelect(id, file, false);
+                }
+                e.target.value = '';
+              }}
+              className="hidden"
+              disabled={uploading}
+            />
+            {selectedFile ? (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-yellow-700">
+                    <FileText className="w-4 h-4" />
+                    <span className="text-sm truncate max-w-[200px]">{selectedFile.name}</span>
+                    <span className="text-xs text-gray-500">({(selectedFile.size / 1024).toFixed(1)} KB)</span>
+                    <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded">⏳ Pending</span>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => removeSelectedFile(id)}
+                    className="h-8"
+                    disabled={uploading}
+                  >
+                    <X className="w-4 h-4 text-red-500" />
+                  </Button>
+                </div>
+
+                {selectedFile.previewUrl && (
+                  <div className="border rounded overflow-hidden bg-gray-50">
+                    <img
+                      src={selectedFile.previewUrl}
+                      alt={selectedFile.name}
+                      className="w-full h-48 object-contain"
+                    />
+                  </div>
+                )}
+
+                {isUploading && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-blue-600">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span className="text-sm">Uploading... {progress}%</span>
+                    </div>
+                    <Progress value={progress} className="h-2" />
+                  </div>
+                )}
+              </div>
+            ) : (
+              <label htmlFor={id} className="cursor-pointer block text-center py-2">
+                <Upload className="w-6 h-6 mx-auto mb-1 text-gray-400" />
+                <p className="text-xs text-gray-600">Click to select file</p>
+                <p className="text-xs text-gray-400 mt-1">Max 5MB • PDF, JPG, PNG</p>
+              </label>
+            )}
+          </div>
+        )}
+
+        {error && (
+          <Alert className="bg-red-50 border-red-200">
+            <AlertCircle className="h-4 w-4 text-red-600" />
+            <AlertDescription className="text-red-800 text-xs">
+              {error}
+            </AlertDescription>
+          </Alert>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className="space-y-6">
+      {/* Upload Status Alert */}
+      {hasUnuploadedFiles && (
+        <Alert className="bg-yellow-50 border-yellow-200">
+          <AlertCircle className="h-4 w-4 text-yellow-600" />
+          <AlertDescription>
+            <span className="text-yellow-800">
+              <strong>{selectedCount} file(s)</strong> selected. Click "Upload All Documents" below to save to server.
+            </span>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* Required Documents Alert */}
+      <Alert>
+        <AlertCircle className="h-4 w-4" />
+        <AlertDescription>
+          <strong>Required:</strong> Please upload clear, legible copies of all required documents.
+          Some medical documents may be required based on your health declaration.
+        </AlertDescription>
+      </Alert>
+
+      {/* Section 1: Identity Documents */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Upload className="h-5 w-5" />
-            Upload Documents
+          <CardTitle className="flex items-center gap-2 text-xl">
+            <Shield className="w-5 h-5 text-blue-600" />
+            Identity Verification (Required)
           </CardTitle>
           <CardDescription>
-            Please upload all required documents. Files must be in JPG, PNG, or PDF format.
+            Government-issued identification for identity verification
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
-          {/* Progress Summary */}
-          <Alert>
-            <FileText className="h-4 w-4" />
-            <AlertDescription>
-              <div className="flex justify-between items-center">
-                <span>
-                  Uploaded: <strong>{uploadedCount}</strong> of <strong>{totalCount}</strong> documents
-                </span>
-                <span className="text-sm text-gray-600">
-                  Required: {requiredCount} | Optional: {totalCount - requiredCount}
-                </span>
-              </div>
-            </AlertDescription>
-          </Alert>
+        <CardContent className="space-y-4">
+          <div className="grid md:grid-cols-2 gap-4">
+            <FileUploadBox
+              id="identityCardFront"
+              label="Photo ID - Front Side"
+              required
+              description="(Driver's License, Passport, National ID)"
+            />
 
-          {/* Document Upload Sections */}
-          {DOCUMENT_TYPES.map((docType) => {
-            const isUploaded = !!documents[docType.id];
-            const isUploading = uploading[docType.id];
+            <FileUploadBox
+              id="identityCardBack"
+              label="Photo ID - Back Side"
+              required
+              description="(If applicable)"
+            />
+          </div>
 
-            return (
-              <Card key={docType.id} className={`p-4 ${isUploaded ? 'border-green-200 bg-green-50' : ''}`}>
-                <div className="flex items-start justify-between mb-2">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h4 className="font-semibold">
-                        {docType.name}
-                        {docType.required && <span className="text-red-500 ml-1">*</span>}
-                      </h4>
-                      {isUploaded && (
-                        <CheckCircle className="h-5 w-5 text-green-600" />
-                      )}
-                    </div>
-                    <p className="text-sm text-gray-600">{docType.description}</p>
-                    <p className="text-xs text-gray-500 mt-1">Max size: {docType.maxSize}MB</p>
-                  </div>
-                </div>
-
-                {isUploaded ? (
-                  <div className="mt-3 p-3 bg-white rounded border border-green-200">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <FileText className="h-5 w-5 text-green-600" />
-                        <div>
-                          <p className="text-sm font-medium">{documents[docType.id].name}</p>
-                          <p className="text-xs text-gray-500">
-                            {formatFileSize(documents[docType.id].size)} • 
-                            Uploaded on {new Date(documents[docType.id].uploadedAt).toLocaleDateString()}
-                          </p>
-                        </div>
-                      </div>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleRemoveFile(docType.id)}
-                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="mt-3">
-                    <Label
-                      htmlFor={`file_${docType.id}`}
-                      className={`flex items-center justify-center w-full h-32 px-4 transition border-2 border-dashed rounded-lg cursor-pointer ${
-                        errors[docType.id]
-                          ? 'border-red-300 bg-red-50 hover:bg-red-100'
-                          : 'border-gray-300 bg-gray-50 hover:bg-gray-100'
-                      }`}
-                    >
-                      <div className="space-y-2 text-center">
-                        {isUploading ? (
-                          <>
-                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-                            <p className="text-sm text-gray-600">Uploading...</p>
-                          </>
-                        ) : (
-                          <>
-                            <Upload className="mx-auto h-8 w-8 text-gray-400" />
-                            <div className="text-sm text-gray-600">
-                              <span className="font-semibold text-blue-600">Click to upload</span> or drag and drop
-                            </div>
-                            <p className="text-xs text-gray-500">JPG, PNG or PDF (max {docType.maxSize}MB)</p>
-                          </>
-                        )}
-                      </div>
-                      <Input
-                        id={`file_${docType.id}`}
-                        type="file"
-                        className="hidden"
-                        accept=".jpg,.jpeg,.png,.pdf"
-                        onChange={(e) => handleFileSelect(docType.id, e)}
-                        disabled={isUploading}
-                      />
-                    </Label>
-                    {errors[docType.id] && (
-                      <div className="flex items-center gap-2 mt-2 text-red-600">
-                        <AlertCircle className="h-4 w-4" />
-                        <p className="text-sm">{errors[docType.id]}</p>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </Card>
-            );
-          })}
-
-          {/* Important Note */}
-          <Alert>
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>
-              <strong>Important:</strong>
-              <ul className="list-disc list-inside mt-2 space-y-1 text-sm">
-                <li>All documents must be clear and legible</li>
-                <li>Documents should not be older than 3 months (except ID proof)</li>
-                <li>Ensure all information is visible in the uploaded documents</li>
-                <li>Original documents may be requested during verification</li>
-              </ul>
-            </AlertDescription>
-          </Alert>
+          <div className="grid md:grid-cols-2 gap-4">
+            <FileUploadBox
+              id="socialSecurityCard"
+              label="Social Security Card"
+              required
+            />
+          </div>
         </CardContent>
       </Card>
 
-      {/* Navigation */}
-      <div className="flex justify-between">
-        <Button type="button" variant="outline" onClick={onBack}>
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Back
+      {/* Section 2: Health/Medical Documents (Conditional) */}
+      {requiresHealthDocs && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-xl">
+              <Heart className="w-5 h-5 text-red-500" />
+              Health Documentation
+            </CardTitle>
+            <CardDescription>
+              Medical records required based on your health declaration
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid md:grid-cols-2 gap-4">
+              <FileUploadBox
+                id="medicalExamReport"
+                label="Medical Examination Report"
+                description="(Recent physical exam within 6 months)"
+              />
+
+              <FileUploadBox
+                id="labResults"
+                label="Laboratory Test Results"
+                description="(Blood work, urinalysis, etc.)"
+              />
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-4">
+              <FileUploadBox
+                id="prescriptionHistory"
+                label="Prescription Medication List"
+                description="(Current medications and dosages)"
+              />
+
+              <FileUploadBox
+                id="doctorLetter"
+                label="Doctor's Letter (if applicable)"
+                description="(For pre-existing conditions)"
+              />
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Section 3: Additional Documents */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-xl">
+            <FileCheck className="w-5 h-5 text-gray-600" />
+            Additional Documents (Optional)
+          </CardTitle>
+          <CardDescription>
+            Other supporting documentation
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid md:grid-cols-2 gap-4">
+            <FileUploadBox
+              id="proofOfResidence"
+              label="Proof of Residence"
+              description="(Utility bill, lease agreement, etc.)"
+            />
+
+            <FileUploadBox
+              id="previousPolicyDocument"
+              label="Previous Health Insurance Policy"
+              description="(If you had previous coverage)"
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Upload All Documents Button */}
+      {hasUnuploadedFiles && (
+        <div className="flex gap-3">
+          <Button
+            onClick={handleUploadAll}
+            size="lg"
+            className="flex-1"
+            disabled={uploading}
+          >
+            {uploading ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Uploading...
+              </>
+            ) : (
+              <>
+                <CloudUpload className="w-4 h-4 mr-2" />
+                Upload All Documents ({selectedCount})
+              </>
+            )}
+          </Button>
+        </div>
+      )}
+
+      {/* Navigation Buttons */}
+      <div className="flex justify-between pt-4">
+        <Button onClick={onBack} variant="outline" size="lg">
+          <ArrowLeft className="w-4 h-4 mr-2" />
+          Back to Product Selection
         </Button>
-        <Button type="button" onClick={handleNext}>
-          Continue to Review
-          <ArrowRight className="ml-2 h-4 w-4" />
+        <Button
+          onClick={handleNext}
+          size="lg"
+          disabled={!hasRequiredDocs || hasUnuploadedFiles}
+        >
+          Continue to Review & Submit
+          <ArrowRight className="w-4 h-4 ml-2" />
         </Button>
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteDialog.open} onOpenChange={(open) => !isDeleting && setDeleteDialog({ ...deleteDialog, open })}>
+        <DialogContent className="sm:max-w-[440px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <div className="flex items-center justify-center w-10 h-10 rounded-full bg-red-100">
+                <Trash2 className="w-5 h-5 text-red-600" />
+              </div>
+              <span>Delete Document?</span>
+            </DialogTitle>
+            <DialogDescription className="pt-3 text-left">
+              You are about to delete <span className="font-semibold text-gray-900">{deleteDialog.fileName}</span>. This action will permanently remove the file from the server and cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-2 mt-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setDeleteDialog({ open: false, field: null, index: null, fileName: '' })}
+              disabled={isDeleting}
+              className="flex-1"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={confirmDelete}
+              disabled={isDeleting}
+              className="flex-1 gap-2"
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="w-4 h-4" />
+                  Delete
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -1,0 +1,16 @@
+Msg 515, Level 16, State 2, Server DESKTOP-J9RRC0F, Line 8
+Cannot insert the value NULL into column 'AgeMultiplier18_25', table 'InsuranceServiceDb.dbo.MedicalInsurancePlans'; column does not allow nulls. INSERT fails.
+The statement has been terminated.
+Msg 515, Level 16, State 2, Server DESKTOP-J9RRC0F, Line 74
+Cannot insert the value NULL into column 'AgeMultiplier18_25', table 'InsuranceServiceDb.dbo.MedicalInsurancePlans'; column does not allow nulls. INSERT fails.
+The statement has been terminated.
+Msg 515, Level 16, State 2, Server DESKTOP-J9RRC0F, Line 128
+Cannot insert the value NULL into column 'AgeMultiplier18_25', table 'InsuranceServiceDb.dbo.MedicalInsurancePlans'; column does not allow nulls. INSERT fails.
+The statement has been terminated.
+Msg 515, Level 16, State 2, Server DESKTOP-J9RRC0F, Line 182
+Cannot insert the value NULL into column 'AgeMultiplier18_25', table 'InsuranceServiceDb.dbo.MedicalInsurancePlans'; column does not allow nulls. INSERT fails.
+The statement has been terminated.
+Id          PlanName                                                                                                                                                                                                                                                         PlanCode                                                                                                                                                                                                                                                         AnnualCoverageLimit  Deductible           BasePremiumMonthly   BasePremiumAnnual    IsActive IsPopular
+----------- ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- -------------------- -------------------- -------------------- -------------------- -------- ---------
+
+(0 rows affected)

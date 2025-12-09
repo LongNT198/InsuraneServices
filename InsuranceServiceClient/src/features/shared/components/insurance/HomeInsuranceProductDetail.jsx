@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { Alert, AlertDescription } from '../ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
-import { 
-  Shield, Heart, TrendingUp, CheckCircle2, CheckCircle, X, 
-  Users, DollarSign, Calendar, FileText, 
+import {
+  Shield, Heart, TrendingUp, CheckCircle2, CheckCircle, X,
+  Users, DollarSign, Calendar, FileText,
   AlertCircle, Info, ArrowRight, Star, Gift,
   Building2, Home, Car, Hospital, BriefcaseMedical,
   CircleDollarSign, Banknote, Wallet, CreditCard,
@@ -24,6 +24,7 @@ import productsService from '../../api/services/productsService';
 export function HomeInsuranceProductDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [product, setProduct] = useState(null);
   const [plans, setPlans] = useState([]);
   const [selectedPlan, setSelectedPlan] = useState(null);
@@ -38,7 +39,7 @@ export function HomeInsuranceProductDetail() {
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [id]);
-  
+
   // Custom plan state
   const [showCustomPlan, setShowCustomPlan] = useState(false);
   const [customCoverage, setCustomCoverage] = useState(250000);
@@ -47,7 +48,7 @@ export function HomeInsuranceProductDetail() {
   const [customPremium, setCustomPremium] = useState(null);
   const [calculatingCustom, setCalculatingCustom] = useState(false);
   const [termError, setTermError] = useState('');
-  
+
   // Dynamic ranges based on current product's plans
   const coverageRange = plans.length > 0 ? {
     min: Math.min(...plans.map(p => p.coverageAmount)),
@@ -57,7 +58,7 @@ export function HomeInsuranceProductDetail() {
     ),
     step: 5000
   } : { min: 100000, max: 1000000, step: 5000 };
-  
+
   const termRange = plans.length > 0 ? {
     min: Math.min(...plans.map(p => p.termLength || p.termYears)),
     max: Math.max(...plans.map(p => p.termLength || p.termYears))
@@ -67,6 +68,19 @@ export function HomeInsuranceProductDetail() {
     loadProductDetails();
   }, [id]);
 
+  // Handle hash scrolling for #plans
+  useEffect(() => {
+    if (location.hash === '#plans') {
+      setActiveTab('plans');
+      setTimeout(() => {
+        const element = document.getElementById('plans-section');
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 500);
+    }
+  }, [location.hash]);
+
   // Smooth scroll to top when tab changes
   useEffect(() => {
     // Scroll to the tabs list wrapper
@@ -75,10 +89,10 @@ export function HomeInsuranceProductDetail() {
       // Get the sticky bar height to offset the scroll
       const stickyBar = document.querySelector('.sticky.top-0.z-40');
       const stickyBarHeight = stickyBar ? stickyBar.offsetHeight : 0;
-      
+
       const elementPosition = tabsListWrapper.getBoundingClientRect().top + window.pageYOffset;
       const offsetPosition = elementPosition - stickyBarHeight - 20; // 20px extra padding
-      
+
       window.scrollTo({
         top: offsetPosition,
         behavior: 'smooth'
@@ -89,12 +103,12 @@ export function HomeInsuranceProductDetail() {
   const loadProductDetails = async () => {
     try {
       setLoading(true);
-      
+
       // Load product details
       const productResponse = await axios.get(`/api/products/${id}`);
       console.log('🎯 Product Response:', productResponse);
       console.log('💰 Response Data:', productResponse?.data);
-      
+
       // Extract product from response (handle both direct and nested structure)
       const productData = productResponse?.data?.data || productResponse?.data || productResponse?.product || productResponse;
       console.log('📝 Product Data:', productData);
@@ -106,7 +120,7 @@ export function HomeInsuranceProductDetail() {
         adminFee: productData?.adminFee
       });
       setProduct(productData);
-      
+
       // Load plans
       const plansData = await plansService.getPlansByProduct(id);
       setPlans(plansData || []);
@@ -124,7 +138,7 @@ export function HomeInsuranceProductDetail() {
       // Load related products (other Home Insurance products)
       try {
         const relatedResponse = await productsService.getProductsByType('Home');
-        
+
         // Handle different response structures
         let allProducts = [];
         if (Array.isArray(relatedResponse)) {
@@ -136,7 +150,7 @@ export function HomeInsuranceProductDetail() {
         } else if (Array.isArray(relatedResponse?.$values)) {
           allProducts = relatedResponse.$values;
         }
-        
+
         const related = allProducts.filter(p => p.id !== parseInt(id)).slice(0, 3);
         console.log('✅ Related Products:', related);
         setRelatedProducts(related);
@@ -184,19 +198,19 @@ export function HomeInsuranceProductDetail() {
       setTermError('Term cannot exceed 40 years');
       return false;
     }
-    
+
     // Check if term is available in any plan
     if (plans.length > 0) {
       const availableTerms = [...new Set(plans.map(p => p.termLength))];
       const minTerm = Math.min(...availableTerms);
       const maxTerm = Math.max(...availableTerms);
-      
+
       if (termNum < minTerm || termNum > maxTerm) {
         setTermError(`Term must be between ${minTerm} and ${maxTerm} years for this product`);
         return false;
       }
     }
-    
+
     setTermError('');
     return true;
   };
@@ -214,45 +228,45 @@ export function HomeInsuranceProductDetail() {
   // Calculate custom plan premium
   const calculateCustomPremium = async () => {
     if (!product || plans.length === 0) return;
-    
+
     // Validate term before calculating
     if (!validateTerm(customTerm)) {
       return;
     }
-    
+
     setCalculatingCustom(true);
     setCustomPremium(null);
-    
+
     try {
       // Smart base plan selection - find closest match to custom values
       const targetCoverage = customCoverage;
       const targetTerm = parseInt(customTerm);
-      
+
       // Find plan with closest coverage and term
       let closestPlan = plans[0];
       let minDifference = Infinity;
-      
+
       for (const plan of plans) {
         const coverageDiff = Math.abs((plan.coverageAmount || 0) - targetCoverage);
         const termDiff = Math.abs((plan.termLength || plan.termYears || 0) - targetTerm) * 10000; // Weight term less
         const totalDiff = coverageDiff + termDiff;
-        
+
         if (totalDiff < minDifference) {
           minDifference = totalDiff;
           closestPlan = plan;
         }
       }
-      
+
       const basePlanId = closestPlan?.insurancePlanId || closestPlan?.id;
-      
+
       if (!basePlanId) {
         console.error('No valid plan ID found');
         setCustomPremium(null);
         return;
       }
-      
+
       console.log('Calculating with closest plan:', closestPlan.planName, 'planId:', basePlanId, 'coverage:', customCoverage, 'term:', customTerm);
-      
+
       const response = await axios.post('/api/plans/calculate', {
         planId: basePlanId,
         customCoverageAmount: customCoverage,
@@ -263,7 +277,7 @@ export function HomeInsuranceProductDetail() {
         occupationRisk: 'Low',
         paymentFrequency: customPaymentFrequency
       });
-      
+
       setCustomPremium(response.calculatedPremium);
     } catch (error) {
       console.error('Error calculating custom premium:', error);
@@ -272,10 +286,10 @@ export function HomeInsuranceProductDetail() {
       setCalculatingCustom(false);
     }
   };
-  
+
   const handleApplyCustomPlan = () => {
     if (!customPremium || !product || !validateTerm(customTerm)) return;
-    
+
     // Map payment frequency to URL format
     const frequencyMap = {
       'Monthly': 'monthly',
@@ -285,7 +299,7 @@ export function HomeInsuranceProductDetail() {
       'LumpSum': 'single'
     };
     const urlFrequency = frequencyMap[customPaymentFrequency] || 'annual';
-    
+
     navigate(`/apply-home?productId=${product.insuranceProductId}&coverage=${customCoverage}&term=${parseInt(customTerm)}&frequency=${urlFrequency}&premium=${customPremium}&custom=true`);
   };
 
@@ -293,17 +307,17 @@ export function HomeInsuranceProductDetail() {
   useEffect(() => {
     const loadPlanPrices = async () => {
       if (plans.length === 0) return;
-      
+
       setCalculatingPrices(true);
       const prices = {};
-      
+
       for (const plan of plans) {
         const price = await calculatePlanPremium(plan.id, selectedPaymentFrequency);
         if (price) {
           prices[plan.id] = price;
         }
       }
-      
+
       setPlanPrices(prices);
       setCalculatingPrices(false);
     };
@@ -314,13 +328,13 @@ export function HomeInsuranceProductDetail() {
   const handleApplyNow = async (planId = null) => {
     const targetPlanId = planId || selectedPlan?.id;
     const targetPlan = plans.find(p => p.id === targetPlanId);
-    
+
     // Show age requirement alert for unauthenticated users
     if (targetPlan && (targetPlan.minAge > 18 || targetPlan.maxAge < 65)) {
       const ageRequirement = `This plan is available for ages ${targetPlan.minAge}-${targetPlan.maxAge}. Please ensure you meet the age requirements when applying.`;
       console.log('⚠️ Age requirement alert:', ageRequirement);
     }
-    
+
     // Map frequency format for backend
     const frequencyMap = {
       'monthly': 'Monthly',
@@ -330,7 +344,7 @@ export function HomeInsuranceProductDetail() {
       'single': 'LumpSum'
     };
     const mappedFrequency = frequencyMap[selectedPaymentFrequency] || 'Annual';
-    
+
     // Save selection to localStorage (for non-authenticated users or page refresh)
     // NOTE: Premium will be calculated in Step 3 with user's actual age/health data
     const selectionData = {
@@ -349,7 +363,7 @@ export function HomeInsuranceProductDetail() {
     };
     console.log('💾 Saving plan selection to localStorage:', selectionData);
     localStorage.setItem('calculatorParams', JSON.stringify(selectionData));
-    
+
     // Navigate WITHOUT premium in URL - premium will be auto-calculated in Step 3
     // This ensures accurate pricing based on user's actual property and location details
     navigate(`/apply-home?productId=${id}&planId=${targetPlanId}&frequency=${selectedPaymentFrequency}`);
@@ -394,7 +408,7 @@ export function HomeInsuranceProductDetail() {
   }
 
   const features = product.features?.split('|') || [];
-  
+
   const keyBenefits = [
     {
       icon: Home,
@@ -863,7 +877,7 @@ export function HomeInsuranceProductDetail() {
 
             {/* Plans & Pricing Tab */}
             <TabsContent value="plans" id="plans-section" className="space-y-8 animate-in fade-in-50 duration-500">
-              
+
               {/* Header - Simple style like Schemes.jsx */}
               <div className="text-center mb-12">
                 <Badge className="mb-4">Available Plans</Badge>
@@ -894,8 +908,8 @@ export function HomeInsuranceProductDetail() {
                       variant={selectedPaymentFrequency === freq.value ? 'default' : 'outline'}
                       onClick={() => setSelectedPaymentFrequency(freq.value)}
                       disabled={calculatingPrices}
-                      className={`cursor-pointer ${selectedPaymentFrequency === freq.value 
-                        ? '!bg-purple-600 hover:!bg-purple-700 !text-white !border-purple-600' 
+                      className={`cursor-pointer ${selectedPaymentFrequency === freq.value
+                        ? '!bg-purple-600 hover:!bg-purple-700 !text-white !border-purple-600'
                         : ''} ${calculatingPrices ? 'cursor-not-allowed' : ''}`}
                     >
                       {freq.label}
@@ -945,13 +959,12 @@ export function HomeInsuranceProductDetail() {
                   const isSelected = selectedPlan?.id === plan.id;
                   const isPopular = plan.isPopular;
                   const calculatedPrice = planPrices[plan.id];
-                  
+
                   return (
-                    <Card 
+                    <Card
                       key={`plan-${plan.id}`}
-                      className={`hover:shadow-lg transition-shadow ${
-                        isPopular ? 'border-2 border-purple-500' : ''
-                      }`}
+                      className={`hover:shadow-lg transition-shadow ${isPopular ? 'border-2 border-purple-500' : ''
+                        }`}
                     >
                       <CardHeader>
                         {isPopular && (
@@ -986,22 +999,22 @@ export function HomeInsuranceProductDetail() {
                                   ${Math.round(calculatedPrice).toLocaleString()}
                                 </p>
                                 <p className="text-xs text-gray-600 mt-1">
-                                  per {selectedPaymentFrequency === 'LumpSum' ? 'policy' : 
-                                       selectedPaymentFrequency === 'Monthly' ? 'month' :
-                                       selectedPaymentFrequency === 'Quarterly' ? 'quarter' :
-                                       selectedPaymentFrequency === 'Semi-Annual' ? '6 months' : 'year'}
+                                  per {selectedPaymentFrequency === 'LumpSum' ? 'policy' :
+                                    selectedPaymentFrequency === 'Monthly' ? 'month' :
+                                      selectedPaymentFrequency === 'Quarterly' ? 'quarter' :
+                                        selectedPaymentFrequency === 'Semi-Annual' ? '6 months' : 'year'}
                                 </p>
                                 {selectedPaymentFrequency !== 'Annual' && (() => {
                                   // Calculate base (Annual) and adjustment
-                                  const adjustmentRate = 
+                                  const adjustmentRate =
                                     selectedPaymentFrequency === 'LumpSum' ? -0.08 :
-                                    selectedPaymentFrequency === 'Monthly' ? 0.05 :
-                                    selectedPaymentFrequency === 'Quarterly' ? 0.03 : 0.02;
-                                  
+                                      selectedPaymentFrequency === 'Monthly' ? 0.05 :
+                                        selectedPaymentFrequency === 'Quarterly' ? 0.03 : 0.02;
+
                                   const basePremium = Math.round(calculatedPrice / (1 + adjustmentRate));
                                   const adjustmentAmount = Math.round(calculatedPrice - basePremium);
                                   const sign = adjustmentAmount >= 0 ? '+' : '';
-                                  
+
                                   return (
                                     <div className="mt-2 pt-2 border-t border-gray-200">
                                       <div className="text-xs space-y-1">
@@ -1009,15 +1022,14 @@ export function HomeInsuranceProductDetail() {
                                           <span>Base (Annual):</span>
                                           <span className="font-medium">${basePremium.toLocaleString()}</span>
                                         </div>
-                                        <div className={`flex justify-between font-medium ${
-                                          selectedPaymentFrequency === 'LumpSum' ? 'text-green-600' :
+                                        <div className={`flex justify-between font-medium ${selectedPaymentFrequency === 'LumpSum' ? 'text-green-600' :
                                           selectedPaymentFrequency === 'Monthly' ? 'text-red-600' : 'text-orange-600'
-                                        }`}>
+                                          }`}>
                                           <span>
                                             {selectedPaymentFrequency === 'LumpSum' ? 'Discount (-8%):' :
-                                             selectedPaymentFrequency === 'Monthly' ? 'Surcharge (+5%):' :
-                                             selectedPaymentFrequency === 'Quarterly' ? 'Surcharge (+3%):' :
-                                             'Surcharge (+2%):'}
+                                              selectedPaymentFrequency === 'Monthly' ? 'Surcharge (+5%):' :
+                                                selectedPaymentFrequency === 'Quarterly' ? 'Surcharge (+3%):' :
+                                                  'Surcharge (+2%):'}
                                           </span>
                                           <span>{sign}${Math.abs(adjustmentAmount).toLocaleString()}</span>
                                         </div>
@@ -1089,11 +1101,11 @@ export function HomeInsuranceProductDetail() {
 
                           {/* Apply Button - Simple style like Schemes.jsx */}
                           <div className="pt-3 border-t">
-                            <Button 
-                              className="w-full cursor-pointer" 
+                            <Button
+                              className="w-full cursor-pointer"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                
+
                                 // Map payment frequency to URL format
                                 const frequencyMap = {
                                   'Monthly': 'monthly',
@@ -1103,10 +1115,10 @@ export function HomeInsuranceProductDetail() {
                                   'LumpSum': 'single'
                                 };
                                 const urlFrequency = frequencyMap[selectedPaymentFrequency] || 'annual';
-                                
+
                                 // Get calculated premium for this plan
                                 const premium = planPrices[plan.id] || 0;
-                                
+
                                 // Navigate to application with query params
                                 navigate(`/apply-home?productId=${product.id}&planId=${plan.id}&frequency=${urlFrequency}&premium=${Math.round(premium)}`);
                               }}
@@ -1132,17 +1144,19 @@ export function HomeInsuranceProductDetail() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => setShowCustomPlan(!showCustomPlan)}
-                      className="!text-purple-600 hover:!text-purple-700 hover:!bg-purple-100 !cursor-pointer"
+                      disabled={true}
+                      className="!text-gray-400 !bg-gray-100 !cursor-not-allowed border border-gray-200"
                     >
-                      {showCustomPlan ? (
-                        <>Hide Customization <ChevronUp className="size-4 ml-2" /></>
-                      ) : (
-                        <>Customize Plan <ChevronDown className="size-4 ml-2" /></>
-                      )}
+                      Maintenance <Wrench className="size-4 ml-2" />
                     </Button>
                   </div>
                 </CardHeader>
+                <div className="px-6 pb-4">
+                  <p className="text-sm text-gray-500 bg-gray-50 p-3 rounded-lg border border-gray-100 flex items-center gap-2">
+                    <Info className="size-4 text-gray-400" />
+                    This feature is currently under maintenance. Please select a standard plan above.
+                  </p>
+                </div>
 
                 {showCustomPlan && (
                   <CardContent>
@@ -1195,11 +1209,10 @@ export function HomeInsuranceProductDetail() {
                             max={termRange.max}
                             value={customTerm}
                             onChange={handleTermChange}
-                            className={`w-full px-4 py-2 border-2 rounded-lg focus:outline-none focus:ring-2 ${
-                              termError 
-                                ? 'border-red-300 focus:border-red-500 focus:ring-red-200' 
-                                : 'border-purple-200 focus:border-purple-500 focus:ring-purple-200'
-                            }`}
+                            className={`w-full px-4 py-2 border-2 rounded-lg focus:outline-none focus:ring-2 ${termError
+                              ? 'border-red-300 focus:border-red-500 focus:ring-red-200'
+                              : 'border-purple-200 focus:border-purple-500 focus:ring-purple-200'
+                              }`}
                             placeholder="Enter term length"
                           />
                           {termError && (
@@ -1232,7 +1245,7 @@ export function HomeInsuranceProductDetail() {
                             }
                             return null;
                           })()}
-                          
+
                           <div className="text-xs text-gray-600 italic mt-2">
                             Specify how many years of coverage you need. Must be within the range supported by this product's plans.
                           </div>
@@ -1256,20 +1269,18 @@ export function HomeInsuranceProductDetail() {
                                 type="button"
                                 variant={customPaymentFrequency === freq.value ? 'default' : 'outline'}
                                 onClick={() => setCustomPaymentFrequency(freq.value)}
-                                className={`!cursor-pointer justify-between text-xs ${
-                                  customPaymentFrequency === freq.value
-                                    ? '!bg-purple-600 hover:!bg-purple-700 !text-white !border-purple-600'
-                                    : '!border-purple-200 !text-gray-700 hover:!bg-purple-50'
-                                }`}
+                                className={`!cursor-pointer justify-between text-xs ${customPaymentFrequency === freq.value
+                                  ? '!bg-purple-600 hover:!bg-purple-700 !text-white !border-purple-600'
+                                  : '!border-purple-200 !text-gray-700 hover:!bg-purple-50'
+                                  }`}
                               >
                                 <span>{freq.label}</span>
-                                <span className={`text-xs font-medium ${
-                                  customPaymentFrequency === freq.value
-                                    ? 'text-white'
-                                    : freq.value === 'LumpSum' ? 'text-green-600' :
-                                      freq.value === 'Monthly' ? 'text-red-600' :
+                                <span className={`text-xs font-medium ${customPaymentFrequency === freq.value
+                                  ? 'text-white'
+                                  : freq.value === 'LumpSum' ? 'text-green-600' :
+                                    freq.value === 'Monthly' ? 'text-red-600' :
                                       freq.value === 'Annual' ? 'text-gray-500' : 'text-orange-600'
-                                }`}>
+                                  }`}>
                                   {freq.badge}
                                 </span>
                               </Button>
@@ -1324,7 +1335,7 @@ export function HomeInsuranceProductDetail() {
                                 <span className="text-sm text-green-700">Payment Frequency</span>
                                 <span className="font-bold text-green-900">{customPaymentFrequency}</span>
                               </div>
-                              
+
                               <div className="bg-white rounded-lg p-4 mt-4">
                                 <div className="text-center">
                                   <p className="text-xs text-gray-500 mb-1">Estimated Premium</p>
@@ -1342,7 +1353,7 @@ export function HomeInsuranceProductDetail() {
                             <Alert className="bg-blue-50 border-blue-200">
                               <Info className="size-4 text-blue-600" />
                               <AlertDescription className="text-xs text-blue-800">
-                                <strong>Note:</strong> This is an estimated premium based on standard assumptions (Age 30, Male, Good Health, Low Risk Occupation). 
+                                <strong>Note:</strong> This is an estimated premium based on standard assumptions (Age 30, Male, Good Health, Low Risk Occupation).
                                 Your actual premium will be calculated after you provide complete personal and health information in the application form.
                               </AlertDescription>
                             </Alert>
@@ -1500,13 +1511,12 @@ export function HomeInsuranceProductDetail() {
                   <CardContent>
                     <div className="space-y-3">
                       {section.items.map((item, itemIdx) => (
-                        <div 
+                        <div
                           key={itemIdx}
-                          className={`flex items-start gap-3 p-4 rounded-lg border ${
-                            item.covered 
-                              ? 'bg-green-50 border-green-200' 
-                              : 'bg-red-50 border-red-200'
-                          }`}
+                          className={`flex items-start gap-3 p-4 rounded-lg border ${item.covered
+                            ? 'bg-green-50 border-green-200'
+                            : 'bg-red-50 border-red-200'
+                            }`}
                         >
                           {item.covered ? (
                             <CheckCircle2 className="size-5 text-green-600 mt-0.5 flex-shrink-0" />
@@ -1536,7 +1546,7 @@ export function HomeInsuranceProductDetail() {
                     <div>
                       <h4 className="font-semibold text-blue-900 mb-2">Important Note</h4>
                       <p className="text-sm text-blue-800">
-                        Coverage details may vary by plan and state. All claims are subject to policy terms and conditions. 
+                        Coverage details may vary by plan and state. All claims are subject to policy terms and conditions.
                         Please review your policy documents carefully or contact our support team for clarification.
                       </p>
                     </div>
@@ -1582,7 +1592,7 @@ export function HomeInsuranceProductDetail() {
                     <div>
                       <h4 className="font-semibold text-orange-900 mb-2">Disclosure Requirement</h4>
                       <p className="text-sm text-orange-800 mb-3">
-                        You must disclose all material information during application. Non-disclosure or 
+                        You must disclose all material information during application. Non-disclosure or
                         misrepresentation can lead to claim rejection or policy cancellation.
                       </p>
                       <ul className="list-disc list-inside space-y-1 text-sm text-orange-800">
@@ -1612,7 +1622,7 @@ export function HomeInsuranceProductDetail() {
                     {idx !== claimsProcess.length - 1 && (
                       <div className="absolute left-6 top-12 bottom-0 w-0.5 bg-blue-200" />
                     )}
-                    
+
                     <Card className="relative hover:shadow-lg transition-shadow">
                       <CardContent className="p-6">
                         <div className="flex gap-6">
@@ -2085,8 +2095,8 @@ export function HomeInsuranceProductDetail() {
                   </p>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-3">
-                  <Button 
-                    size="lg" 
+                  <Button
+                    size="lg"
                     variant="secondary"
                     onClick={handleGetQuote}
                     className="cursor-pointer"
@@ -2113,7 +2123,7 @@ export function HomeInsuranceProductDetail() {
                 <p className="font-semibold text-purple-600">1-800-HOME</p>
               </CardContent>
             </Card>
-            
+
             <Card>
               <CardContent className="p-6 text-center">
                 <MessageCircle className="size-8 text-purple-600 mx-auto mb-3" />
@@ -2122,7 +2132,7 @@ export function HomeInsuranceProductDetail() {
                 <Button variant="link" className="text-purple-600 p-0 cursor-pointer">Start Chat</Button>
               </CardContent>
             </Card>
-            
+
             <Card>
               <CardContent className="p-6 text-center">
                 <Mail className="size-8 text-purple-600 mx-auto mb-3" />

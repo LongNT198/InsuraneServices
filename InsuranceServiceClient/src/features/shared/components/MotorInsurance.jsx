@@ -2,13 +2,13 @@ import { useState, useEffect } from 'react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Link } from 'react-router-dom';
-import { Car, Shield, TrendingUp, Users, CheckCircle, ArrowRight, AlertCircle, Wrench } from 'lucide-react';
+import { Car, Shield, TrendingUp, Users, CheckCircle, ArrowRight, AlertCircle, Wrench, Calculator } from 'lucide-react';
 import { Badge } from './ui/badge';
 import axios from '../api/axios';
 import { ComparisonTable } from './insurance/ComparisonTable';
 import { PremiumCalculator } from './insurance/PremiumCalculator';
 import { FAQSection } from './insurance/FAQSection';
-import { MiniCalculator } from './insurance/MiniCalculator';
+// import { MiniCalculator } from './insurance/MiniCalculator';
 import plansService from '../api/services/plansService';
 
 export function MotorInsurance() {
@@ -237,7 +237,12 @@ export function MotorInsurance() {
                             </Link>
                           </Button>
                         </div>
-                        <MiniCalculator product={product} productType="Motor" />
+                        <Button className="w-full" variant="outline" asChild>
+                          <Link to={`/motor-insurance/${product.id}#plans`}>
+                            <Calculator className="size-4 mr-2" />
+                            Get Quote
+                          </Link>
+                        </Button>
                       </div>
                     </CardContent>
                   </Card>
@@ -245,7 +250,7 @@ export function MotorInsurance() {
               })
             )}
           </div>
-          
+
           {/* Comparison Table */}
           {!loading && products.length > 1 && (
             <ComparisonTable products={products} productType="Motor" />

@@ -2,13 +2,13 @@ import { useState, useEffect } from 'react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Link } from 'react-router-dom';
-import { Heart, Shield, TrendingUp, Users, CheckCircle, ArrowRight, AlertCircle } from 'lucide-react';
+import { Heart, Shield, TrendingUp, Users, CheckCircle, ArrowRight, AlertCircle, Calculator } from 'lucide-react';
 import { Badge } from './ui/badge';
 import axios from '../api/axios';
 import { ComparisonTable } from './insurance/ComparisonTable';
 import { PremiumCalculator } from './insurance/PremiumCalculator';
 import { FAQSection } from './insurance/FAQSection';
-import { MiniCalculator } from './insurance/MiniCalculator';
+// import { MiniCalculator } from './insurance/MiniCalculator';
 import plansService from '../api/services/plansService';
 
 export function LifeInsurance() {
@@ -178,7 +178,7 @@ export function LifeInsurance() {
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-gray-600 mb-3">
-                  Provides coverage for a specific term. Pays death benefit only if insured dies during the term. 
+                  Provides coverage for a specific term. Pays death benefit only if insured dies during the term.
                   No maturity benefit. Most affordable option.
                 </p>
                 <div className="text-xs text-gray-500">
@@ -194,7 +194,7 @@ export function LifeInsurance() {
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-gray-600 mb-3">
-                  Covers you for entire lifetime. Builds cash value over time. Higher premiums but guaranteed 
+                  Covers you for entire lifetime. Builds cash value over time. Higher premiums but guaranteed
                   payout and savings component.
                 </p>
                 <div className="text-xs text-gray-500">
@@ -210,7 +210,7 @@ export function LifeInsurance() {
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-gray-600 mb-3">
-                  Pays on death OR at maturity. Combines life cover with savings. Good for achieving 
+                  Pays on death OR at maturity. Combines life cover with savings. Good for achieving
                   financial goals like children's education.
                 </p>
                 <div className="text-xs text-gray-500">
@@ -226,7 +226,7 @@ export function LifeInsurance() {
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-gray-600 mb-3">
-                  Flexible premiums and death benefit. Investment component with market returns. 
+                  Flexible premiums and death benefit. Investment component with market returns.
                   Can adjust coverage as needs change.
                 </p>
                 <div className="text-xs text-gray-500">
@@ -242,7 +242,7 @@ export function LifeInsurance() {
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-gray-600 mb-3">
-                  Long-term savings for retirement. Provides regular pension after retirement age. 
+                  Long-term savings for retirement. Provides regular pension after retirement age.
                   Tax-efficient way to build retirement corpus.
                 </p>
                 <div className="text-xs text-gray-500">
@@ -258,7 +258,7 @@ export function LifeInsurance() {
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-gray-600 mb-3">
-                  Unit-linked insurance with stock market investment. Higher returns potential but 
+                  Unit-linked insurance with stock market investment. Higher returns potential but
                   market risk. Lock-in period of 5 years.
                 </p>
                 <div className="text-xs text-gray-500">
@@ -346,7 +346,12 @@ export function LifeInsurance() {
                             </Link>
                           </Button>
                         </div>
-                        <MiniCalculator product={product} productType="Life" />
+                        <Button className="w-full" variant="outline" asChild>
+                          <Link to={`/life-insurance/${product.id}#plans`}>
+                            <Calculator className="size-4 mr-2" />
+                            Get Quote
+                          </Link>
+                        </Button>
                       </div>
                     </CardContent>
                   </Card>
@@ -354,7 +359,7 @@ export function LifeInsurance() {
               })
             )}
           </div>
-          
+
           {/* Comparison Table */}
           {!loading && products.length > 1 && (
             <ComparisonTable products={products} productType="Life" />

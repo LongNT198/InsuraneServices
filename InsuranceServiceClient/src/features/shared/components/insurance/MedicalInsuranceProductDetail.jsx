@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { Alert, AlertDescription } from '../ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
-import { 
-  Shield, Heart, TrendingUp, CheckCircle2, CheckCircle, X, 
-  Users, DollarSign, Calendar, FileText, 
+import {
+  Shield, Heart, TrendingUp, CheckCircle2, CheckCircle, X,
+  Users, DollarSign, Calendar, FileText,
   AlertCircle, Info, ArrowRight, Star, Gift,
   Phone, Mail, MessageCircle, Download,
   Clock, Award, Target, Zap, Percent,
@@ -16,15 +16,16 @@ import {
   UserCheck, Baby, GraduationCap, Briefcase,
   FileCheck, ClipboardCheck, FileSignature, Timer,
   PieChart, BarChart3, Receipt, Calculator,
-  ChevronDown, ChevronUp, Stethoscope, Pill, Ambulance, Activity, HeartPulse
+  ChevronDown, ChevronUp, Stethoscope, Pill, Ambulance, Activity, HeartPulse, Wrench
 } from 'lucide-react';
 import axios from '../../api/axios';
-import plansService, { calculatePlanPremium } from '../../api/services/plansService';
+import medicalPlansService from '../../api/services/medicalPlansService';
 import productsService from '../../api/services/productsService';
 
 export function MedicalInsuranceProductDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [product, setProduct] = useState(null);
   const [plans, setPlans] = useState([]);
   const [selectedPlan, setSelectedPlan] = useState(null);
@@ -32,14 +33,12 @@ export function MedicalInsuranceProductDetail() {
   const [relatedProducts, setRelatedProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
-  const [calculatingPrices, setCalculatingPrices] = useState(false);
-  const [planPrices, setPlanPrices] = useState({});
 
   // Scroll to top when component mounts
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [id]);
-  
+
   // Custom plan state
   const [showCustomPlan, setShowCustomPlan] = useState(false);
   const [customCoverage, setCustomCoverage] = useState(250000);
@@ -48,7 +47,7 @@ export function MedicalInsuranceProductDetail() {
   const [customPremium, setCustomPremium] = useState(null);
   const [calculatingCustom, setCalculatingCustom] = useState(false);
   const [termError, setTermError] = useState('');
-  
+
   // Dynamic ranges based on current product's plans
   const coverageRange = plans.length > 0 ? {
     min: Math.min(...plans.map(p => p.coverageAmount)),
@@ -58,7 +57,7 @@ export function MedicalInsuranceProductDetail() {
     ),
     step: 5000
   } : { min: 100000, max: 1000000, step: 5000 };
-  
+
   const termRange = plans.length > 0 ? {
     min: Math.min(...plans.map(p => p.termLength || p.termYears)),
     max: Math.max(...plans.map(p => p.termLength || p.termYears))
@@ -68,6 +67,19 @@ export function MedicalInsuranceProductDetail() {
     loadProductDetails();
   }, [id]);
 
+  // Handle hash scrolling for #plans
+  useEffect(() => {
+    if (location.hash === '#plans') {
+      setActiveTab('plans');
+      setTimeout(() => {
+        const element = document.getElementById('plans-section');
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 500);
+    }
+  }, [location.hash]);
+
   // Smooth scroll to top when tab changes
   useEffect(() => {
     // Scroll to the tabs list wrapper
@@ -76,10 +88,10 @@ export function MedicalInsuranceProductDetail() {
       // Get the sticky bar height to offset the scroll
       const stickyBar = document.querySelector('.sticky.top-0.z-40');
       const stickyBarHeight = stickyBar ? stickyBar.offsetHeight : 0;
-      
+
       const elementPosition = tabsListWrapper.getBoundingClientRect().top + window.pageYOffset;
       const offsetPosition = elementPosition - stickyBarHeight - 20; // 20px extra padding
-      
+
       window.scrollTo({
         top: offsetPosition,
         behavior: 'smooth'
@@ -90,12 +102,12 @@ export function MedicalInsuranceProductDetail() {
   const loadProductDetails = async () => {
     try {
       setLoading(true);
-      
+
       // Load product details
       const productResponse = await axios.get(`/api/products/${id}`);
       console.log('🎯 Product Response:', productResponse);
       console.log('💰 Response Data:', productResponse?.data);
-      
+
       // Extract product from response (handle both direct and nested structure)
       const productData = productResponse?.data?.data || productResponse?.data || productResponse?.product || productResponse;
       console.log('📝 Product Data:', productData);
@@ -107,17 +119,17 @@ export function MedicalInsuranceProductDetail() {
         adminFee: productData?.adminFee
       });
       setProduct(productData);
-      
-      // Load plans
-      const plansData = await plansService.getPlansByProduct(id);
+
+      // Load medical plans
+      const plansData = await medicalPlansService.getMedicalPlansByProduct(id);
       setPlans(plansData || []);
       if (plansData && plansData.length > 0) {
         setSelectedPlan(plansData[0]);
         // Set default custom coverage to middle plan's coverage
-        const sortedByAmount = [...plansData].sort((a, b) => a.coverageAmount - b.coverageAmount);
+        const sortedByAmount = [...plansData].sort((a, b) => a.annualCoverageLimit - b.annualCoverageLimit);
         const middleIndex = Math.floor(sortedByAmount.length / 2);
-        const defaultCoverage = sortedByAmount[middleIndex]?.coverageAmount || 250000;
-        const defaultTerm = sortedByAmount[middleIndex]?.termLength || sortedByAmount[middleIndex]?.termYears || 20;
+        const defaultCoverage = sortedByAmount[middleIndex]?.annualCoverageLimit || 250000;
+        const defaultTerm = sortedByAmount[middleIndex]?.termYears || 20;
         setCustomCoverage(defaultCoverage);
         setCustomTerm(defaultTerm.toString());
       }
@@ -125,7 +137,7 @@ export function MedicalInsuranceProductDetail() {
       // Load related products (other Medical Insurance products)
       try {
         const relatedResponse = await productsService.getProductsByType('Medical');
-        
+
         // Handle different response structures
         let allProducts = [];
         if (Array.isArray(relatedResponse)) {
@@ -137,7 +149,7 @@ export function MedicalInsuranceProductDetail() {
         } else if (Array.isArray(relatedResponse?.$values)) {
           allProducts = relatedResponse.$values;
         }
-        
+
         const related = allProducts.filter(p => p.id !== parseInt(id)).slice(0, 3);
         console.log('✅ Related Products:', related);
         setRelatedProducts(related);
@@ -152,23 +164,7 @@ export function MedicalInsuranceProductDetail() {
     }
   };
 
-  // Calculate premium for a plan using actual API
-  const calculatePlanPremium = async (planId, frequency) => {
-    try {
-      const response = await axios.post('/api/plans/calculate', {
-        planId: planId,
-        age: 30, // Default values for display
-        gender: 'Male',
-        healthStatus: 'Good',
-        occupationRisk: 'Low',
-        paymentFrequency: frequency
-      });
-      return response.calculatedPremium;
-    } catch (error) {
-      console.error('Error calculating premium:', error);
-      return null;
-    }
-  };
+
 
   // Validate term length
   const validateTerm = (value) => {
@@ -185,19 +181,19 @@ export function MedicalInsuranceProductDetail() {
       setTermError('Term cannot exceed 40 years');
       return false;
     }
-    
+
     // Check if term is available in any plan
     if (plans.length > 0) {
       const availableTerms = [...new Set(plans.map(p => p.termLength))];
       const minTerm = Math.min(...availableTerms);
       const maxTerm = Math.max(...availableTerms);
-      
+
       if (termNum < minTerm || termNum > maxTerm) {
         setTermError(`Term must be between ${minTerm} and ${maxTerm} years for this product`);
         return false;
       }
     }
-    
+
     setTermError('');
     return true;
   };
@@ -215,45 +211,45 @@ export function MedicalInsuranceProductDetail() {
   // Calculate custom plan premium
   const calculateCustomPremium = async () => {
     if (!product || plans.length === 0) return;
-    
+
     // Validate term before calculating
     if (!validateTerm(customTerm)) {
       return;
     }
-    
+
     setCalculatingCustom(true);
     setCustomPremium(null);
-    
+
     try {
       // Smart base plan selection - find closest match to custom values
       const targetCoverage = customCoverage;
       const targetTerm = parseInt(customTerm);
-      
+
       // Find plan with closest coverage and term
       let closestPlan = plans[0];
       let minDifference = Infinity;
-      
+
       for (const plan of plans) {
         const coverageDiff = Math.abs((plan.coverageAmount || 0) - targetCoverage);
         const termDiff = Math.abs((plan.termLength || plan.termYears || 0) - targetTerm) * 10000; // Weight term less
         const totalDiff = coverageDiff + termDiff;
-        
+
         if (totalDiff < minDifference) {
           minDifference = totalDiff;
           closestPlan = plan;
         }
       }
-      
+
       const basePlanId = closestPlan?.insurancePlanId || closestPlan?.id;
-      
+
       if (!basePlanId) {
         console.error('No valid plan ID found');
         setCustomPremium(null);
         return;
       }
-      
+
       console.log('Calculating with closest plan:', closestPlan.planName, 'planId:', basePlanId, 'coverage:', customCoverage, 'term:', customTerm);
-      
+
       const response = await axios.post('/api/plans/calculate', {
         planId: basePlanId,
         customCoverageAmount: customCoverage,
@@ -264,7 +260,7 @@ export function MedicalInsuranceProductDetail() {
         occupationRisk: 'Low',
         paymentFrequency: customPaymentFrequency
       });
-      
+
       setCustomPremium(response.calculatedPremium);
     } catch (error) {
       console.error('Error calculating custom premium:', error);
@@ -273,10 +269,10 @@ export function MedicalInsuranceProductDetail() {
       setCalculatingCustom(false);
     }
   };
-  
+
   const handleApplyCustomPlan = () => {
     if (!customPremium || !product || !validateTerm(customTerm)) return;
-    
+
     // Map payment frequency to URL format
     const frequencyMap = {
       'Monthly': 'monthly',
@@ -286,42 +282,22 @@ export function MedicalInsuranceProductDetail() {
       'LumpSum': 'single'
     };
     const urlFrequency = frequencyMap[customPaymentFrequency] || 'annual';
-    
+
     navigate(`/apply-medical?productId=${product.insuranceProductId}&coverage=${customCoverage}&term=${parseInt(customTerm)}&frequency=${urlFrequency}&premium=${customPremium}&custom=true`);
   };
 
-  // Load prices for all plans when frequency changes
-  useEffect(() => {
-    const loadPlanPrices = async () => {
-      if (plans.length === 0) return;
-      
-      setCalculatingPrices(true);
-      const prices = {};
-      
-      for (const plan of plans) {
-        const price = await calculatePlanPremium(plan.id, selectedPaymentFrequency);
-        if (price) {
-          prices[plan.id] = price;
-        }
-      }
-      
-      setPlanPrices(prices);
-      setCalculatingPrices(false);
-    };
 
-    loadPlanPrices();
-  }, [plans, selectedPaymentFrequency]);
 
   const handleApplyNow = async (planId = null) => {
     const targetPlanId = planId || selectedPlan?.id;
     const targetPlan = plans.find(p => p.id === targetPlanId);
-    
+
     // Show age requirement alert for unauthenticated users
     if (targetPlan && (targetPlan.minAge > 18 || targetPlan.maxAge < 65)) {
       const ageRequirement = `This plan is available for ages ${targetPlan.minAge}-${targetPlan.maxAge}. Please ensure you meet the age requirements when applying.`;
       console.log('⚠️ Age requirement alert:', ageRequirement);
     }
-    
+
     // Map frequency format for backend
     const frequencyMap = {
       'monthly': 'Monthly',
@@ -331,7 +307,7 @@ export function MedicalInsuranceProductDetail() {
       'single': 'LumpSum'
     };
     const mappedFrequency = frequencyMap[selectedPaymentFrequency] || 'Annual';
-    
+
     // Save selection to localStorage (for non-authenticated users or page refresh)
     // NOTE: Premium will be calculated in Step 3 with user's actual age/health data
     const selectionData = {
@@ -350,7 +326,9 @@ export function MedicalInsuranceProductDetail() {
     };
     console.log('💾 Saving plan selection to localStorage:', selectionData);
     localStorage.setItem('calculatorParams', JSON.stringify(selectionData));
-    
+    // Also save to a persistent key for registration flow restoration
+    localStorage.setItem('pendingMedicalApplication', JSON.stringify(selectionData));
+
     // Navigate WITHOUT premium in URL - premium will be auto-calculated in Step 3
     // This ensures accurate pricing based on user's actual age, gender, and health status
     navigate(`/apply-medical?productId=${id}&planId=${targetPlanId}&frequency=${selectedPaymentFrequency}`);
@@ -395,7 +373,7 @@ export function MedicalInsuranceProductDetail() {
   }
 
   const features = product.features?.split('|') || [];
-  
+
   const keyBenefits = [
     {
       icon: Hospital,
@@ -861,74 +839,22 @@ export function MedicalInsuranceProductDetail() {
 
             {/* Plans & Pricing Tab */}
             <TabsContent value="plans" id="plans-section" className="space-y-8 animate-in fade-in-50 duration-500">
-              
+
               {/* Header - Simple style like Schemes.jsx */}
               <div className="text-center mb-12">
                 <Badge className="mb-4">Available Plans</Badge>
                 <h2 className="mb-4">Medical Insurance Plans</h2>
-                <p className="text-gray-600 max-w-2xl mx-auto">
-                  Choose your payment frequency and compare plans. Prices shown are personalized for age 30, good health, low-risk occupation.
-                </p>
+
               </div>
 
-              {/* Payment Frequency Selector */}
-              <div className="mb-12">
-                <div className="text-center mb-6">
-                  <p className="text-gray-600">
-                    Choose how often you'd like to pay your premiums
-                  </p>
-                </div>
-                <div className="flex flex-wrap gap-3 justify-center">
-                  {[
-                    { value: 'Monthly', label: 'Monthly' },
-                    { value: 'Quarterly', label: 'Quarterly' },
-                    { value: 'Semi-Annual', label: 'Semi-Annual' },
-                    { value: 'Annual', label: 'Annual' },
-                    { value: 'LumpSum', label: 'Lump Sum' }
-                  ].map((freq) => (
-                    <Button
-                      key={freq.value}
-                      type="button"
-                      variant={selectedPaymentFrequency === freq.value ? 'default' : 'outline'}
-                      onClick={() => setSelectedPaymentFrequency(freq.value)}
-                      disabled={calculatingPrices}
-                      className={`cursor-pointer ${selectedPaymentFrequency === freq.value 
-                        ? '!bg-green-600 hover:!bg-green-700 !text-white !border-green-600' 
-                        : ''} ${calculatingPrices ? 'cursor-not-allowed' : ''}`}
-                    >
-                      {freq.label}
-                    </Button>
-                  ))}
-                </div>
-                {calculatingPrices && (
-                  <p className="text-center text-sm text-gray-600 mt-3">Calculating premiums...</p>
-                )}
-              </div>
+              {/* Payment Frequency Selector - REMOVED as per request (Medical is Annual only) */}
+              <div className="mb-6"></div>
 
               {/* Payment Frequency Info */}
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3">
-                <div className="flex items-center gap-2 text-xs text-blue-900">
-                  <Info className="size-4 text-blue-600 flex-shrink-0" />
-                  <span className="font-semibold">Payment Frequency:</span>
-                  <span>Monthly <span className="text-red-600 font-medium">+5%</span></span>
-                  <span className="text-blue-300">•</span>
-                  <span>Quarterly <span className="text-orange-600 font-medium">+3%</span></span>
-                  <span className="text-blue-300">•</span>
-                  <span>Semi-Annual <span className="text-orange-600 font-medium">+2%</span></span>
-                  <span className="text-blue-300">•</span>
-                  <span>Annual <span className="text-gray-600 font-medium">Base</span></span>
-                  <span className="text-blue-300">•</span>
-                  <span>Lump Sum <span className="text-green-600 font-medium">-8%</span></span>
-                </div>
-              </div>
 
-              {/* Important Note */}
-              <Alert className="bg-blue-50 border-blue-200 mb-6">
-                <Info className="size-4 text-blue-600" />
-                <AlertDescription className="text-xs text-blue-800">
-                  <strong>Note:</strong> Estimated premium based on standard profile (Age 30, Male, Good Health, Low Risk). Final rate determined after application review.
-                </AlertDescription>
-              </Alert>
+
+              {/* Important Note - Removed as prices are now fixed */}
+              <div className="mb-6"></div>
 
               {/* Plans Section */}
               <div className="text-center mb-8">
@@ -942,14 +868,13 @@ export function MedicalInsuranceProductDetail() {
                 {plans.map((plan, index) => {
                   const isSelected = selectedPlan?.id === plan.id;
                   const isPopular = plan.isPopular;
-                  const calculatedPrice = planPrices[plan.id];
-                  
+
+
                   return (
-                    <Card 
+                    <Card
                       key={`plan-${plan.id}`}
-                      className={`hover:shadow-lg transition-shadow ${
-                        isPopular ? 'border-2 border-green-500' : ''
-                      }`}
+                      className={`hover:shadow-lg transition-shadow ${isPopular ? 'border-2 border-green-500' : ''
+                        }`}
                     >
                       <CardHeader>
                         {isPopular && (
@@ -965,66 +890,22 @@ export function MedicalInsuranceProductDetail() {
                           </div>
                         </div>
                         <CardDescription>
-                          ${(plan.coverageAmount / 1000).toLocaleString()}k coverage • {plan.termYears} years term
+                          ${((plan.annualCoverageLimit || 0) / 1000).toLocaleString()}k annual limit • {plan.termYears} year{plan.termYears > 1 ? 's' : ''} policy
                         </CardDescription>
                       </CardHeader>
                       <CardContent>
                         <div className="space-y-4">
                           {/* Price Display */}
                           <div className="text-center py-4 bg-gray-50 rounded-lg">
-                            {calculatingPrices || !calculatedPrice ? (
-                              <div className="animate-pulse">
-                                <div className="h-4 bg-gray-200 rounded w-20 mx-auto mb-2"></div>
-                                <div className="h-6 bg-gray-200 rounded w-24 mx-auto"></div>
-                              </div>
-                            ) : (
-                              <>
-                                <p className="text-xs text-gray-600 mb-1">Your Premium</p>
-                                <p className="text-2xl font-bold text-green-600">
-                                  ${Math.round(calculatedPrice).toLocaleString()}
-                                </p>
-                                <p className="text-xs text-gray-600 mt-1">
-                                  per {selectedPaymentFrequency === 'LumpSum' ? 'policy' : 
-                                       selectedPaymentFrequency === 'Monthly' ? 'month' :
-                                       selectedPaymentFrequency === 'Quarterly' ? 'quarter' :
-                                       selectedPaymentFrequency === 'Semi-Annual' ? '6 months' : 'year'}
-                                </p>
-                                {selectedPaymentFrequency !== 'Annual' && (() => {
-                                  // Calculate base (Annual) and adjustment
-                                  const adjustmentRate = 
-                                    selectedPaymentFrequency === 'LumpSum' ? -0.08 :
-                                    selectedPaymentFrequency === 'Monthly' ? 0.05 :
-                                    selectedPaymentFrequency === 'Quarterly' ? 0.03 : 0.02;
-                                  
-                                  const basePremium = Math.round(calculatedPrice / (1 + adjustmentRate));
-                                  const adjustmentAmount = Math.round(calculatedPrice - basePremium);
-                                  const sign = adjustmentAmount >= 0 ? '+' : '';
-                                  
-                                  return (
-                                    <div className="mt-2 pt-2 border-t border-gray-200">
-                                      <div className="text-xs space-y-1">
-                                        <div className="flex justify-between text-gray-600">
-                                          <span>Base (Annual):</span>
-                                          <span className="font-medium">${basePremium.toLocaleString()}</span>
-                                        </div>
-                                        <div className={`flex justify-between font-medium ${
-                                          selectedPaymentFrequency === 'LumpSum' ? 'text-green-600' :
-                                          selectedPaymentFrequency === 'Monthly' ? 'text-red-600' : 'text-orange-600'
-                                        }`}>
-                                          <span>
-                                            {selectedPaymentFrequency === 'LumpSum' ? 'Discount (-8%):' :
-                                             selectedPaymentFrequency === 'Monthly' ? 'Surcharge (+5%):' :
-                                             selectedPaymentFrequency === 'Quarterly' ? 'Surcharge (+3%):' :
-                                             'Surcharge (+2%):'}
-                                          </span>
-                                          <span>{sign}${Math.abs(adjustmentAmount).toLocaleString()}</span>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  );
-                                })()}
-                              </>
-                            )}
+                            <>
+                              <p className="text-xs text-gray-600 mb-1">Starting from</p>
+                              <p className="text-2xl font-bold text-green-600">
+                                ${Math.round(plan.basePremiumAnnual || 0).toLocaleString()}
+                              </p>
+                              <p className="text-xs text-gray-600 mt-1">
+                                per year
+                              </p>
+                            </>
                           </div>
 
                           {/* Key Benefits */}
@@ -1033,40 +914,48 @@ export function MedicalInsuranceProductDetail() {
                             <ul className="space-y-2">
                               <li className="flex items-start gap-2 text-sm">
                                 <CheckCircle className="size-4 text-green-500 flex-shrink-0 mt-0.5" />
-                                <span>${(plan.coverageAmount / 1000).toLocaleString()}k death benefit</span>
+                                <span>${((plan.annualCoverageLimit || 0) / 1000).toLocaleString()}k annual coverage limit</span>
                               </li>
                               <li className="flex items-start gap-2 text-sm">
                                 <CheckCircle className="size-4 text-green-500 flex-shrink-0 mt-0.5" />
-                                <span>{plan.termYears} years coverage period</span>
+                                <span>${(plan.deductible || 0).toLocaleString()} deductible</span>
                               </li>
-                              {plan.accidentalDeathBenefit > 0 && (
+                              <li className="flex items-start gap-2 text-sm">
+                                <CheckCircle className="size-4 text-green-500 flex-shrink-0 mt-0.5" />
+                                <span>{(plan.coPaymentPercentage || 0) > 0 ? `${plan.coPaymentPercentage}% co-pay` : 'No co-pay'}</span>
+                              </li>
+                              <li className="flex items-start gap-2 text-sm">
+                                <CheckCircle className="size-4 text-green-500 flex-shrink-0 mt-0.5" />
+                                <span>{plan.termYears || 1} year{(plan.termYears || 1) > 1 ? 's' : ''} policy term</span>
+                              </li>
+                              {(plan.accidentalInjuryCoverage || 0) > 0 && (
                                 <li className="flex items-start gap-2 text-sm">
                                   <CheckCircle className="size-4 text-green-500 flex-shrink-0 mt-0.5" />
-                                  <span>${(plan.accidentalDeathBenefit / 1000).toLocaleString()}k accidental death benefit</span>
+                                  <span>${((plan.accidentalInjuryCoverage || 0) / 1000).toLocaleString()}k accident & injury coverage</span>
                                 </li>
                               )}
-                              {plan.criticalIllnessBenefit > 0 && (
+                              {(plan.criticalIllnessBenefit || 0) > 0 && (
                                 <li className="flex items-start gap-2 text-sm">
                                   <CheckCircle className="size-4 text-green-500 flex-shrink-0 mt-0.5" />
-                                  <span>${(plan.criticalIllnessBenefit / 1000).toLocaleString()}k critical illness cover</span>
-                                </li>
-                              )}
-                              {plan.disabilityBenefit > 0 && (
-                                <li className="flex items-start gap-2 text-sm">
-                                  <CheckCircle className="size-4 text-green-500 flex-shrink-0 mt-0.5" />
-                                  <span>${(plan.disabilityBenefit / 1000).toLocaleString()}k disability protection</span>
+                                  <span>${((plan.criticalIllnessBenefit || 0) / 1000).toLocaleString()}k critical illness benefit</span>
                                 </li>
                               )}
                               {plan.includesMaternityBenefit && (
                                 <li className="flex items-start gap-2 text-sm">
                                   <CheckCircle className="size-4 text-green-500 flex-shrink-0 mt-0.5" />
-                                  <span>Maternity benefits included</span>
+                                  <span>Maternity & newborn care{plan.maternityCoverageLimit ? ` ($${(plan.maternityCoverageLimit / 1000).toLocaleString()}k)` : ''}</span>
                                 </li>
                               )}
-                              {plan.includesRiderOptions && (
+                              {plan.includesDentalBasic && (
                                 <li className="flex items-start gap-2 text-sm">
                                   <CheckCircle className="size-4 text-green-500 flex-shrink-0 mt-0.5" />
-                                  <span>Optional riders available</span>
+                                  <span>Dental coverage{plan.dentalAnnualLimit ? ` ($${(plan.dentalAnnualLimit / 1000).toLocaleString()}k/year)` : ''}</span>
+                                </li>
+                              )}
+                              {plan.includesVisionBasic && (
+                                <li className="flex items-start gap-2 text-sm">
+                                  <CheckCircle className="size-4 text-green-500 flex-shrink-0 mt-0.5" />
+                                  <span>Vision coverage{plan.visionAnnualLimit ? ` ($${(plan.visionAnnualLimit / 1000).toLocaleString()}k/year)` : ''}</span>
                                 </li>
                               )}
                             </ul>
@@ -1087,11 +976,11 @@ export function MedicalInsuranceProductDetail() {
 
                           {/* Apply Button - Simple style like Schemes.jsx */}
                           <div className="pt-3 border-t">
-                            <Button 
-                              className="w-full cursor-pointer" 
+                            <Button
+                              className="w-full cursor-pointer"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                
+
                                 // Map payment frequency to URL format
                                 const frequencyMap = {
                                   'Monthly': 'monthly',
@@ -1101,12 +990,12 @@ export function MedicalInsuranceProductDetail() {
                                   'LumpSum': 'single'
                                 };
                                 const urlFrequency = frequencyMap[selectedPaymentFrequency] || 'annual';
-                                
+
                                 // Get calculated premium for this plan
-                                const premium = planPrices[plan.id] || 0;
-                                
+                                const premium = plan.basePremiumAnnual || 0;
+
                                 // Navigate to application with query params
-                                navigate(`/apply-life?productId=${product.id}&planId=${plan.id}&frequency=${urlFrequency}&premium=${Math.round(premium)}`);
+                                navigate(`/apply-medical?productId=${product.id}&planId=${plan.id}&frequency=${urlFrequency}&premium=${Math.round(premium)}`);
                               }}
                             >
                               Apply Now <ArrowRight className="size-4 ml-2" />
@@ -1130,17 +1019,19 @@ export function MedicalInsuranceProductDetail() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => setShowCustomPlan(!showCustomPlan)}
-                      className="!text-purple-600 hover:!text-purple-700 hover:!bg-purple-100 !cursor-pointer"
+                      disabled={true}
+                      className="!text-gray-400 !bg-gray-100 !cursor-not-allowed border border-gray-200"
                     >
-                      {showCustomPlan ? (
-                        <>Hide Customization <ChevronUp className="size-4 ml-2" /></>
-                      ) : (
-                        <>Customize Plan <ChevronDown className="size-4 ml-2" /></>
-                      )}
+                      Maintenance <Wrench className="size-4 ml-2" />
                     </Button>
                   </div>
                 </CardHeader>
+                <div className="px-6 pb-4">
+                  <p className="text-sm text-gray-500 bg-gray-50 p-3 rounded-lg border border-gray-100 flex items-center gap-2">
+                    <Info className="size-4 text-gray-400" />
+                    This feature is currently under maintenance. Please select a standard plan above.
+                  </p>
+                </div>
 
                 {showCustomPlan && (
                   <CardContent>
@@ -1193,11 +1084,10 @@ export function MedicalInsuranceProductDetail() {
                             max={termRange.max}
                             value={customTerm}
                             onChange={handleTermChange}
-                            className={`w-full px-4 py-2 border-2 rounded-lg focus:outline-none focus:ring-2 ${
-                              termError 
-                                ? 'border-red-300 focus:border-red-500 focus:ring-red-200' 
-                                : 'border-green-200 focus:border-green-500 focus:ring-green-200'
-                            }`}
+                            className={`w-full px-4 py-2 border-2 rounded-lg focus:outline-none focus:ring-2 ${termError
+                              ? 'border-red-300 focus:border-red-500 focus:ring-red-200'
+                              : 'border-green-200 focus:border-green-500 focus:ring-green-200'
+                              }`}
                             placeholder="Enter term length"
                           />
                           {termError && (
@@ -1230,7 +1120,7 @@ export function MedicalInsuranceProductDetail() {
                             }
                             return null;
                           })()}
-                          
+
                           <div className="text-xs text-gray-600 italic mt-2">
                             Specify how many years of coverage you need. Must be within the range supported by this product's plans.
                           </div>
@@ -1254,20 +1144,18 @@ export function MedicalInsuranceProductDetail() {
                                 type="button"
                                 variant={customPaymentFrequency === freq.value ? 'default' : 'outline'}
                                 onClick={() => setCustomPaymentFrequency(freq.value)}
-                                className={`!cursor-pointer justify-between text-xs ${
-                                  customPaymentFrequency === freq.value
-                                    ? '!bg-green-600 hover:!bg-green-700 !text-white !border-green-600'
-                                    : '!border-green-200 !text-gray-700 hover:!bg-green-50'
-                                }`}
+                                className={`!cursor-pointer justify-between text-xs ${customPaymentFrequency === freq.value
+                                  ? '!bg-green-600 hover:!bg-green-700 !text-white !border-green-600'
+                                  : '!border-green-200 !text-gray-700 hover:!bg-green-50'
+                                  }`}
                               >
                                 <span>{freq.label}</span>
-                                <span className={`text-xs font-medium ${
-                                  customPaymentFrequency === freq.value
-                                    ? 'text-white'
-                                    : freq.value === 'LumpSum' ? 'text-green-600' :
-                                      freq.value === 'Monthly' ? 'text-red-600' :
+                                <span className={`text-xs font-medium ${customPaymentFrequency === freq.value
+                                  ? 'text-white'
+                                  : freq.value === 'LumpSum' ? 'text-green-600' :
+                                    freq.value === 'Monthly' ? 'text-red-600' :
                                       freq.value === 'Annual' ? 'text-gray-500' : 'text-orange-600'
-                                }`}>
+                                  }`}>
                                   {freq.badge}
                                 </span>
                               </Button>
@@ -1322,7 +1210,7 @@ export function MedicalInsuranceProductDetail() {
                                 <span className="text-sm text-green-700">Payment Frequency</span>
                                 <span className="font-bold text-green-900">{customPaymentFrequency}</span>
                               </div>
-                              
+
                               <div className="bg-white rounded-lg p-4 mt-4">
                                 <div className="text-center">
                                   <p className="text-xs text-gray-500 mb-1">Estimated Premium</p>
@@ -1340,7 +1228,7 @@ export function MedicalInsuranceProductDetail() {
                             <Alert className="bg-blue-50 border-blue-200">
                               <Info className="size-4 text-blue-600" />
                               <AlertDescription className="text-xs text-blue-800">
-                                <strong>Note:</strong> This is an estimated premium based on standard assumptions (Age 30, Male, Good Health, Low Risk Occupation). 
+                                <strong>Note:</strong> This is an estimated premium based on standard assumptions (Age 30, Male, Good Health, Low Risk Occupation).
                                 Your actual premium will be calculated after you provide complete personal and health information in the application form.
                               </AlertDescription>
                             </Alert>
@@ -1399,10 +1287,10 @@ export function MedicalInsuranceProductDetail() {
                             ))}
                           </tr>
                           <tr className="border-b">
-                            <td className="py-3 px-4 font-medium">Coverage Amount</td>
+                            <td className="py-3 px-4 font-medium">Annual Coverage Limit</td>
                             {plans.map(plan => (
                               <td key={plan.id} className="text-center py-3 px-4">
-                                ${plan.coverageAmount.toLocaleString()}
+                                ${(plan.annualCoverageLimit || 0).toLocaleString()}
                               </td>
                             ))}
                           </tr>
@@ -1415,26 +1303,26 @@ export function MedicalInsuranceProductDetail() {
                             ))}
                           </tr>
                           <tr className="border-b">
-                            <td className="py-3 px-4 font-medium">Accidental Death</td>
+                            <td className="py-3 px-4 font-medium">Accidental Injury Coverage</td>
                             {plans.map(plan => (
                               <td key={plan.id} className="text-center py-3 px-4">
-                                ${plan.accidentalDeathBenefit.toLocaleString()}
+                                ${(plan.accidentalInjuryCoverage || 0).toLocaleString()}
                               </td>
                             ))}
                           </tr>
                           <tr className="border-b bg-gray-50">
-                            <td className="py-3 px-4 font-medium">Disability Benefit</td>
+                            <td className="py-3 px-4 font-medium">Critical Illness Benefit</td>
                             {plans.map(plan => (
                               <td key={plan.id} className="text-center py-3 px-4">
-                                ${plan.disabilityBenefit.toLocaleString()}
+                                ${(plan.criticalIllnessBenefit || 0).toLocaleString()}
                               </td>
                             ))}
                           </tr>
                           <tr className="border-b">
-                            <td className="py-3 px-4 font-medium">Critical Illness</td>
+                            <td className="py-3 px-4 font-medium">Deductible</td>
                             {plans.map(plan => (
                               <td key={plan.id} className="text-center py-3 px-4">
-                                ${plan.criticalIllnessBenefit.toLocaleString()}
+                                ${(plan.deductible || 0).toLocaleString()}
                               </td>
                             ))}
                           </tr>
@@ -1451,10 +1339,22 @@ export function MedicalInsuranceProductDetail() {
                             ))}
                           </tr>
                           <tr className="border-b">
-                            <td className="py-3 px-4 font-medium">Rider Options</td>
+                            <td className="py-3 px-4 font-medium">Dental Coverage</td>
                             {plans.map(plan => (
                               <td key={plan.id} className="text-center py-3 px-4">
-                                {plan.includesRiderOptions ? (
+                                {plan.includesDentalBasic ? (
+                                  <CheckCircle2 className="size-5 text-green-600 mx-auto" />
+                                ) : (
+                                  <X className="size-5 text-gray-400 mx-auto" />
+                                )}
+                              </td>
+                            ))}
+                          </tr>
+                          <tr className="border-b bg-gray-50">
+                            <td className="py-3 px-4 font-medium">Vision Coverage</td>
+                            {plans.map(plan => (
+                              <td key={plan.id} className="text-center py-3 px-4">
+                                {plan.includesVisionBasic ? (
                                   <CheckCircle2 className="size-5 text-green-600 mx-auto" />
                                 ) : (
                                   <X className="size-5 text-gray-400 mx-auto" />
@@ -1498,13 +1398,12 @@ export function MedicalInsuranceProductDetail() {
                   <CardContent>
                     <div className="space-y-3">
                       {section.items.map((item, itemIdx) => (
-                        <div 
+                        <div
                           key={itemIdx}
-                          className={`flex items-start gap-3 p-4 rounded-lg border ${
-                            item.covered 
-                              ? 'bg-green-50 border-green-200' 
-                              : 'bg-red-50 border-red-200'
-                          }`}
+                          className={`flex items-start gap-3 p-4 rounded-lg border ${item.covered
+                            ? 'bg-green-50 border-green-200'
+                            : 'bg-red-50 border-red-200'
+                            }`}
                         >
                           {item.covered ? (
                             <CheckCircle2 className="size-5 text-green-600 mt-0.5 flex-shrink-0" />
@@ -1534,7 +1433,7 @@ export function MedicalInsuranceProductDetail() {
                     <div>
                       <h4 className="font-semibold text-green-900 mb-2">Important Note</h4>
                       <p className="text-sm text-green-800">
-                        Coverage details may vary by plan and state. All claims are subject to policy terms and conditions. 
+                        Coverage details may vary by plan and state. All claims are subject to policy terms and conditions.
                         Please review your policy documents carefully or contact our support team for clarification.
                       </p>
                     </div>
@@ -1580,7 +1479,7 @@ export function MedicalInsuranceProductDetail() {
                     <div>
                       <h4 className="font-semibold text-orange-900 mb-2">Disclosure Requirement</h4>
                       <p className="text-sm text-orange-800 mb-3">
-                        You must disclose all material information during application. Non-disclosure or 
+                        You must disclose all material information during application. Non-disclosure or
                         misrepresentation can lead to claim rejection or policy cancellation.
                       </p>
                       <ul className="list-disc list-inside space-y-1 text-sm text-orange-800">
@@ -1610,7 +1509,7 @@ export function MedicalInsuranceProductDetail() {
                     {idx !== claimsProcess.length - 1 && (
                       <div className="absolute left-6 top-12 bottom-0 w-0.5 bg-green-200" />
                     )}
-                    
+
                     <Card className="relative hover:shadow-lg transition-shadow">
                       <CardContent className="p-6">
                         <div className="flex gap-6">
@@ -1712,9 +1611,9 @@ export function MedicalInsuranceProductDetail() {
                     <Card className="bg-gradient-to-br from-teal-50 to-teal-100 border-teal-200">
                       <CardContent className="p-6 text-center">
                         <Hospital className="size-12 text-teal-600 mx-auto mb-3" />
-                        <p className="text-sm text-gray-600 mb-1">Coverage Amount</p>
+                        <p className="text-sm text-gray-600 mb-1">Annual Coverage Limit</p>
                         <p className="text-3xl font-bold text-teal-900">
-                          ${selectedPlan.coverageAmount.toLocaleString()}
+                          ${(selectedPlan.annualCoverageLimit || 0).toLocaleString()}
                         </p>
                         <p className="text-xs text-gray-500 mt-2">
                           Medical coverage limit
@@ -2083,8 +1982,8 @@ export function MedicalInsuranceProductDetail() {
                   </p>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-3">
-                  <Button 
-                    size="lg" 
+                  <Button
+                    size="lg"
                     variant="secondary"
                     onClick={handleGetQuote}
                     className="cursor-pointer"
@@ -2111,7 +2010,7 @@ export function MedicalInsuranceProductDetail() {
                 <p className="font-semibold text-green-600">1-800-MEDICAL</p>
               </CardContent>
             </Card>
-            
+
             <Card>
               <CardContent className="p-6 text-center">
                 <MessageCircle className="size-8 text-green-600 mx-auto mb-3" />
@@ -2120,7 +2019,7 @@ export function MedicalInsuranceProductDetail() {
                 <Button variant="link" className="text-green-600 p-0 cursor-pointer">Start Chat</Button>
               </CardContent>
             </Card>
-            
+
             <Card>
               <CardContent className="p-6 text-center">
                 <Mail className="size-8 text-green-600 mx-auto mb-3" />

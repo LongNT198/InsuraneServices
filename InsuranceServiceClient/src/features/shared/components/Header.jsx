@@ -70,7 +70,7 @@ export function Header() {
           <Link to="/" className="flex items-center gap-2">
             <Shield className="size-8 text-blue-600" />
             <span className="text-xl font-semibold text-gray-900">
-              SecureLife Insurance
+              Insurance Services 
             </span>
           </Link>
 
@@ -117,7 +117,6 @@ export function Header() {
             </Link>
             <DropdownMenu>
               <DropdownMenuTrigger className="text-gray-700 hover:text-blue-600 transition font-medium flex items-center gap-1">
-                <Calculator className="size-4" />
                 Get Quote
               </DropdownMenuTrigger>
               <DropdownMenuContent align="center" className="w-56">

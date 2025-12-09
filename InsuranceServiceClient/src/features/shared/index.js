@@ -16,7 +16,7 @@ export { LifeInsurance } from './components/LifeInsurance';
 export { MedicalInsurance } from './components/MedicalInsurance';
 export { MotorInsurance } from './components/MotorInsurance';
 export { HomeInsurance } from './components/HomeInsurance';
-export { ProductDetail } from './components/ProductDetail';
+
 export { Schemes } from './components/Schemes';
 export { PremiumCalculator } from './components/PremiumCalculator';
 export { ComparisonTool } from './components/ComparisonTool';

@@ -31,6 +31,7 @@ namespace InsuranceServiceServer.Core.Data
         // Insurance Business
         public DbSet<InsuranceProduct> InsuranceProducts { get; set; }
         public DbSet<InsurancePlan> InsurancePlans { get; set; } // Fixed plans for each product
+        public DbSet<MedicalInsurancePlan> MedicalInsurancePlans { get; set; } // Medical insurance specific plans
         public DbSet<InsurancePolicy> InsurancePolicies { get; set; }
         public DbSet<InsuranceClaim> InsuranceClaims { get; set; }
         public DbSet<Payment> Payments { get; set; }

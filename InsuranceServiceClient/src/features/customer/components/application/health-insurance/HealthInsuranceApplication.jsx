@@ -6,10 +6,11 @@ import { Button } from '../../../../shared/components/ui/button';
 import { Card, CardContent } from '../../../../shared/components/ui/card';
 import { ArrowLeft, CheckCircle } from 'lucide-react';
 import { profileService } from '../../../../shared/api/services/profileService';
+import axios from '../../../../shared/api/axios';
+import { toast } from 'sonner';
 import { PersonalInfoStep } from '../shared/PersonalInfoStep';
 import HealthInsuranceProductStep from './HealthInsuranceProductStep';
 import HealthInsuranceMedicalStep from './HealthInsuranceMedicalStep';
-import NomineesStep from './NomineesStep';
 import HealthDocumentsStep from './HealthDocumentsStep';
 import HealthReviewStep from './HealthReviewStep';
 
@@ -20,19 +21,14 @@ const STEPS = [
     description: 'Your details',
   },
   {
-    id: 'product',
-    title: 'Product Selection',
-    description: 'Choose your plan',
-  },
-  {
     id: 'medical',
     title: 'Medical Info',
     description: 'Health declaration',
   },
   {
-    id: 'nominees',
-    title: 'Nominees',
-    description: 'Beneficiaries',
+    id: 'product',
+    title: 'Product Selection',
+    description: 'Choose your plan',
   },
   {
     id: 'documents',
@@ -50,19 +46,19 @@ export default function HealthInsuranceApplication() {
   const { user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  
+
   const [currentStep, setCurrentStep] = useState(() => {
     const saved = localStorage.getItem('healthInsuranceApplication_currentStep');
     return saved ? parseInt(saved) : 1;
   });
-  
+
   const [completedSteps, setCompletedSteps] = useState(() => {
     const saved = localStorage.getItem('healthInsuranceApplication_completedSteps');
     return saved ? JSON.parse(saved) : [];
   });
-  
+
   const [profileExists, setProfileExists] = useState(false);
-  
+
   const [formData, setFormData] = useState(() => {
     const saved = localStorage.getItem('healthInsuranceApplication_draft');
     if (saved) {
@@ -73,77 +69,72 @@ export default function HealthInsuranceApplication() {
       }
     }
     return {
-    // Personal Info - compatible with PersonalInfoStep
-    applicant: {
-      firstName: '',
-      lastName: '',
-      email: '',
-      phone: '',
-      dateOfBirth: '',
-      gender: '',
-      nationalId: '',
-      occupation: '',
-      annualIncome: '',
-      address: '',
-      city: '',
-      postalCode: '',
-      emergencyContactName: '',
-      emergencyContactRelationship: '',
-      emergencyContactPhone: '',
-    },
-    
-    // Product Selection
-    productSelection: {
-      planType: '',
-      sumInsured: '',
-      numberOfMembers: 1,
-      members: [],
-      premium: 0
-    },
-    
-    // Medical Information
-    medicalInfo: {
-      currentHealth: '',
-      recentHospitalization: false,
-      hospitalizationDetails: '',
-      preExistingConditions: {
-        diabetes: { has: false, controlled: '', medication: '' },
-        hypertension: { has: false, controlled: '', medication: '' },
-        asthma: { has: false, controlled: '', medication: '' },
-        heartDisease: { has: false, details: '' },
-        thyroid: { has: false, controlled: '', medication: '' },
-        kidneyDisease: { has: false, details: '' },
-        cancer: { has: false, details: '' }
+      // Personal Info - compatible with PersonalInfoStep
+      applicant: {
+        firstName: '',
+        lastName: '',
+        email: '',
+        phone: '',
+        dateOfBirth: '',
+        gender: '',
+        nationalId: '',
+        occupation: '',
+        annualIncome: '',
+        address: '',
+        city: '',
+        postalCode: '',
+        emergencyContactName: '',
+        emergencyContactRelationship: '',
+        emergencyContactPhone: '',
       },
-      lifestyle: {
-        smoking: '',
-        alcohol: '',
-        height: '',
-        weight: '',
-        bmi: ''
+
+      // Product Selection
+      productSelection: {
+        planType: '',
+        sumInsured: '',
+        premium: 0
       },
-      covid19: {
-        hadCovid: '',
-        dateOfRecovery: '',
-        complications: ''
+
+      // Medical Information
+      medicalInfo: {
+        currentHealth: '',
+        recentHospitalization: false,
+        hospitalizationDetails: '',
+        preExistingConditions: {
+          diabetes: { has: false, controlled: '', medication: '' },
+          hypertension: { has: false, controlled: '', medication: '' },
+          asthma: { has: false, controlled: '', medication: '' },
+          heartDisease: { has: false, details: '' },
+          thyroid: { has: false, controlled: '', medication: '' },
+          kidneyDisease: { has: false, details: '' },
+          cancer: { has: false, details: '' }
+        },
+        lifestyle: {
+          smoking: '',
+          alcohol: '',
+          height: '',
+          weight: '',
+          bmi: ''
+        },
+        covid19: {
+          hadCovid: '',
+          dateOfRecovery: '',
+          complications: ''
+        },
+        womensHealth: {
+          pregnant: '',
+          dueDate: '',
+          complications: ''
+        },
+        consent: false
       },
-      womensHealth: {
-        pregnant: '',
-        dueDate: '',
-        complications: ''
-      },
-      consent: false
-    },
-    
-    // Nominees
-    nominees: [],
-    
-    // Documents
-    documents: {},
-    
-    // Review
-    termsAccepted: false,
-    declarationAccepted: false
+
+      // Documents
+      documents: {},
+
+      // Review
+      termsAccepted: false,
+      declarationAccepted: false
     };
   });
 
@@ -154,27 +145,52 @@ export default function HealthInsuranceApplication() {
     localStorage.setItem('healthInsuranceApplication_completedSteps', JSON.stringify(completedSteps));
   }, [formData, currentStep, completedSteps]);
 
-  // Load data from URL params when coming from Calculator
+  // Load data from URL params or persistent localStorage (from registration flow)
   useEffect(() => {
     const productId = searchParams.get('productId');
+    const planId = searchParams.get('planId');
     const coverageAmount = searchParams.get('coverageAmount');
-    const age = searchParams.get('age');
-    const paymentFrequency = searchParams.get('paymentFrequency');
     const premiumAmount = searchParams.get('premiumAmount');
-    const productType = searchParams.get('type');
 
-    if (productId && premiumAmount) {
+    // Priority 1: URL Params (Direct link or immediate navigation)
+    if (productId) {
       setFormData(prev => ({
         ...prev,
         productSelection: {
           ...prev.productSelection,
-          planType: productType || 'Individual',
+          planType: planId ? parseInt(planId) : '',
           sumInsured: coverageAmount || '',
           premium: parseFloat(premiumAmount) || 0
         }
       }));
     }
-    
+    // Priority 2: Pending Application Data (Returned from Registration/Login)
+    else {
+      const pendingData = localStorage.getItem('pendingMedicalApplication');
+      if (pendingData) {
+        try {
+          const parsed = JSON.parse(pendingData);
+          if (parsed.productId && parsed.planId) {
+            console.log("📥 Restoring pending application data:", parsed);
+            setFormData(prev => ({
+              ...prev,
+              productSelection: {
+                ...prev.productSelection,
+                planType: parsed.planId ? parseInt(parsed.planId) : '',
+                sumInsured: parsed.coverageAmount?.toString() || '',
+                premium: 0 // Will be calculated by Step 3 logic
+              }
+            }));
+            // Optional: Clear it so it doesn't persist forever, 
+            // but maybe keep it until submission? unique ID check?
+            // For now, let's keep it until submission clears all drafts.
+          }
+        } catch (e) {
+          console.error("Error parsing pending application data", e);
+        }
+      }
+    }
+
     // Redirect to login if not authenticated, preserving all URL params
     if (!isAuthenticated) {
       const currentUrl = `/apply-health${window.location.search}`;
@@ -193,10 +209,10 @@ export default function HealthInsuranceApplication() {
     const loadProfile = async () => {
       try {
         const profile = await profileService.getProfile();
-        
+
         if (profile && profile.firstName && profile.lastName) {
           setProfileExists(true);
-          
+
           setFormData(prev => ({
             ...prev,
             applicant: {
@@ -256,19 +272,169 @@ export default function HealthInsuranceApplication() {
   const handleSubmit = async () => {
     try {
       console.log('Submitting health insurance application:', formData);
-      // TODO: API call to submit health insurance application
+      toast.loading('Submitting your application...');
+
+      const productId = searchParams.get('productId');
+      const request = mapFormDataToRequest(formData, productId);
       
-      // Clear draft from localStorage
-      localStorage.removeItem('healthInsuranceApplication_draft');
-      localStorage.removeItem('healthInsuranceApplication_currentStep');
-      localStorage.removeItem('healthInsuranceApplication_completedSteps');
+      console.log('🚀 Request payload:', request);
+      console.log('📋 Health Declaration:', request.HealthDeclaration);
+
+      const response = await axios.post('/api/applications', request);
       
-      alert('Health Insurance Application Submitted Successfully!');
-      navigate('/dashboard');
+      console.log('✅ Response:', response);
+      console.log('📦 Response data:', response.data);
+
+      toast.dismiss();
+      
+      // API returns data directly in response (not response.data)
+      const result = response.data || response;
+      
+      if (result && result.success) {
+        toast.success('Application Submitted Successfully!');
+
+        // Clear draft from localStorage
+        localStorage.removeItem('healthInsuranceApplication_draft');
+        localStorage.removeItem('healthInsuranceApplication_currentStep');
+        localStorage.removeItem('healthInsuranceApplication_completedSteps');
+        localStorage.removeItem('pendingMedicalApplication'); // Clear persistent data
+
+        navigate('/application-success', {
+          state: {
+            applicationId: result.id,
+            applicationNumber: result.applicationNumber
+          }
+        });
+      } else {
+        console.error('⚠️ Unexpected response:', response);
+        toast.error('Unexpected response from server');
+      }
     } catch (error) {
-      console.error('Submission error:', error);
-      alert(`Failed to submit application: ${error.message || 'Please try again.'}`);
+      console.error('❌ Submission error:', error);
+      console.error('❌ Error response:', error.response);
+      console.error('❌ Error data:', error.response?.data);
+      toast.dismiss();
+      toast.error(`Failed to submit application: ${error.response?.data?.message || error.response?.data?.title || error.message || 'Please try again.'}`);
     }
+  };
+
+  const mapFormDataToRequest = (data, productId) => {
+    const { applicant, productSelection, healthDeclaration: healthDec, medicalInfo, nominees, documents, termsAccepted, declarationAccepted } = data;
+
+    // Use healthDeclaration if available (from HealthInsuranceMedicalStep), otherwise map from medicalInfo (legacy)
+    const medicalData = healthDec || medicalInfo;
+
+    // Map Medical Conditions - handle both new format (healthDec) and old format (medicalInfo)
+    let healthDeclaration;
+    
+    if (healthDec) {
+      // New format from HealthInsuranceMedicalStep - map directly
+      const medicalConditions = [];
+      const medications = [];
+
+      // Collect medical conditions
+      if (healthDec.hasDiabetes) medicalConditions.push('Diabetes');
+      if (healthDec.hasHeartDisease) medicalConditions.push('Heart Disease');
+      if (healthDec.hasHighBloodPressure) medicalConditions.push('High Blood Pressure');
+      if (healthDec.hasCancer) medicalConditions.push('Cancer');
+      if (healthDec.hasKidneyDisease) medicalConditions.push('Kidney Disease');
+      if (healthDec.hasLiverDisease) medicalConditions.push('Liver Disease');
+      if (healthDec.hasAsthma) medicalConditions.push('Asthma');
+      if (healthDec.hasThyroidDisorder) medicalConditions.push('Thyroid Disorder');
+
+      // Add other medical conditions
+      if (healthDec.otherMedicalConditions) {
+        medicalConditions.push(healthDec.otherMedicalConditions);
+      }
+
+      // Collect medications
+      if (healthDec.isOnMedication && healthDec.medications) {
+        medications.push(healthDec.medications);
+      }
+
+      healthDeclaration = {
+        Height: healthDec.height?.toString(),
+        Weight: healthDec.weight?.toString(),
+        SmokingStatus: healthDec.smokingStatus || 'non-smoker',
+        AlcoholConsumption: healthDec.alcoholConsumptionLevel || 'none',
+        IsSmoker: healthDec.smokingStatus === 'regular' || healthDec.smokingStatus === 'occasional',
+        HasDiabetes: healthDec.hasDiabetes || false,
+        HasHighBloodPressure: healthDec.hasHighBloodPressure || false,
+        HasHeartDisease: healthDec.hasHeartDisease || false,
+        HasKidneyDisease: healthDec.hasKidneyDisease || false,
+        HasCancer: healthDec.hasCancer || false,
+        MedicalConditions: medicalConditions,
+        Medications: medications,
+        MedicalRecordsConsent: healthDec.medicalRecordsConsent || false
+      };
+    } else if (medicalInfo) {
+      // Legacy format - keep old mapping
+      healthDeclaration = {
+        Height: medicalInfo.lifestyle?.height?.toString(),
+        Weight: medicalInfo.lifestyle?.weight?.toString(),
+        SmokingStatus: medicalInfo.lifestyle?.smoking?.toLowerCase() === 'yes' ? 'regular' : 'non-smoker',
+        AlcoholConsumption: medicalInfo.lifestyle?.alcohol?.toLowerCase() === 'yes' ? 'moderate' : 'none',
+        IsSmoker: medicalInfo.lifestyle?.smoking?.toLowerCase() === 'yes',
+        HasDiabetes: medicalInfo.preExistingConditions?.diabetes?.has || false,
+        HasHighBloodPressure: medicalInfo.preExistingConditions?.hypertension?.has || false,
+        HasHeartDisease: medicalInfo.preExistingConditions?.heartDisease?.has || false,
+        HasKidneyDisease: medicalInfo.preExistingConditions?.kidneyDisease?.has || false,
+        HasCancer: medicalInfo.preExistingConditions?.cancer?.has || false,
+        MedicalConditions: [],
+        Medications: [],
+        MedicalRecordsConsent: medicalInfo.consent || false
+      };
+
+      // Add conditions to list
+      if (medicalInfo.preExistingConditions?.asthma?.has) {
+        healthDeclaration.MedicalConditions.push('Asthma');
+        if (medicalInfo.preExistingConditions.asthma.medication) {
+          healthDeclaration.Medications.push(`Asthma: ${medicalInfo.preExistingConditions.asthma.medication}`);
+        }
+      }
+      if (medicalInfo.preExistingConditions?.thyroid?.has) {
+        healthDeclaration.MedicalConditions.push('Thyroid Disorder');
+        if (medicalInfo.preExistingConditions.thyroid.medication) {
+          healthDeclaration.Medications.push(`Thyroid: ${medicalInfo.preExistingConditions.thyroid.medication}`);
+        }
+      }
+      if (medicalInfo.covid19?.hadCovid === 'Yes') {
+        healthDeclaration.MedicalConditions.push(`COVID-19 History`);
+      }
+    }
+
+    return {
+      ProductId: productId ? parseInt(productId) : (parseInt(data.productSelection.planType) || 0), // Fallback if planType is ID
+      CoverageAmount: parseFloat(productSelection.sumInsured) || 0,
+      TermYears: 1,
+      PaymentFrequency: 'Annual',
+      PremiumAmount: productSelection.premium,
+
+      Applicant: {
+        FirstName: applicant.firstName,
+        LastName: applicant.lastName,
+        Email: applicant.email,
+        Phone: applicant.phone,
+        DateOfBirth: applicant.dateOfBirth,
+        Gender: applicant.gender,
+        NationalId: applicant.nationalId,
+        Occupation: applicant.occupation,
+        AnnualIncome: parseFloat(applicant.annualIncome) || 0,
+        Address: applicant.address,
+        City: applicant.city,
+        PostalCode: applicant.postalCode,
+        EmergencyContactName: applicant.emergencyContactName,
+        EmergencyContactPhone: applicant.emergencyContactPhone,
+        EmergencyContactRelationship: applicant.emergencyContactRelationship
+      },
+
+      HealthDeclaration: healthDeclaration,
+
+      Beneficiaries: [],
+
+      TermsAccepted: termsAccepted,
+      DeclarationAccepted: declarationAccepted
+    };
   };
 
   const renderStep = () => {
@@ -286,18 +452,16 @@ export default function HealthInsuranceApplication() {
         );
       case 2:
         return (
-          <HealthInsuranceProductStep
+          <HealthInsuranceMedicalStep
             data={formData}
-            onNext={(stepData) => {
-              handleDataChange(stepData);
-              handleNext();
-            }}
-            onBack={handlePrevious}
+            onChange={handleDataChange}
+            onNext={handleNext}
+            onPrevious={handlePrevious}
           />
         );
       case 3:
         return (
-          <HealthInsuranceMedicalStep
+          <HealthInsuranceProductStep
             data={formData}
             onNext={(stepData) => {
               handleDataChange(stepData);
@@ -308,27 +472,14 @@ export default function HealthInsuranceApplication() {
         );
       case 4:
         return (
-          <NomineesStep
+          <HealthDocumentsStep
             data={formData}
-            onNext={(stepData) => {
-              handleDataChange(stepData);
-              handleNext();
-            }}
+            onChange={handleDataChange}
+            onNext={handleNext}
             onBack={handlePrevious}
           />
         );
       case 5:
-        return (
-          <HealthDocumentsStep
-            data={formData}
-            onNext={(stepData) => {
-              handleDataChange(stepData);
-              handleNext();
-            }}
-            onBack={handlePrevious}
-          />
-        );
-      case 6:
         return (
           <HealthReviewStep
             data={formData}
@@ -355,10 +506,10 @@ export default function HealthInsuranceApplication() {
             Back
           </Button>
           <h1 className="text-2xl font-bold text-gray-900">
-            Health Insurance Application
+            Medical Insurance Application
           </h1>
           <p className="text-gray-600 text-sm mt-1">
-            Complete your health insurance application in a few simple steps
+            Complete your medical insurance application in a few simple steps
           </p>
         </div>
 

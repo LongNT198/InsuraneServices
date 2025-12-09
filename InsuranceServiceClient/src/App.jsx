@@ -22,7 +22,7 @@ import { LifeInsurance } from './features/shared/components/LifeInsurance';
 import { MedicalInsurance } from './features/shared/components/MedicalInsurance';
 import { MotorInsurance } from './features/shared/components/MotorInsurance';
 import { HomeInsurance } from './features/shared/components/HomeInsurance';
-import { ProductDetail } from './features/shared/components/ProductDetail';
+
 import { LifeInsuranceProductDetail } from './features/shared/components/insurance/LifeInsuranceProductDetail';
 import { MedicalInsuranceProductDetail } from './features/shared/components/insurance/MedicalInsuranceProductDetail';
 import { MotorInsuranceProductDetail } from './features/shared/components/insurance/MotorInsuranceProductDetail';
@@ -94,176 +94,184 @@ export default function App() {
         <AuthProvider>
           <AdminAuthProvider>
             <ToastProvider>
-              <Toaster 
-                position="top-right" 
+              <Toaster
+                position="top-right"
                 expand={false}
-                richColors 
+                richColors
                 closeButton
                 duration={4000}
               />
               <div className="min-h-screen flex flex-col bg-gray-50">
                 <AppLayout>
-                <Routes>
-                <Route path="/" element={<Home />} />
-                <Route path="/login" element={<Login />} />
-                <Route path="/register" element={<Register />} />
-                <Route path="/forgot-password" element={<ForgotPassword />} />
-                <Route path="/reset-password" element={<ResetPassword />} />
-                <Route path="/check-email" element={<CheckEmail />} />
-                <Route path="/verify-email" element={<VerifyEmail />} />
-                <Route 
-                  path="/complete-profile" 
-                  element={
-                    <ProtectedRoute>
-                      <CompleteProfile />
-                    </ProtectedRoute>
-                  } 
-                />
-                <Route 
-                  path="/verify-phone" 
-                  element={
-                    <ProtectedRoute>
-                      <VerifyPhone />
-                    </ProtectedRoute>
-                  } 
-                />
-                <Route path="/life-insurance" element={<LifeInsurance />} />
-                <Route path="/life-insurance/:id" element={<LifeInsuranceProductDetail />} />
-                <Route path="/medical-insurance" element={<MedicalInsurance />} />
-                <Route path="/medical-insurance/:id" element={<MedicalInsuranceProductDetail />} />
-                <Route path="/motor-insurance" element={<MotorInsurance />} />
-                <Route path="/motor-insurance/:id" element={<MotorInsuranceProductDetail />} />
-                <Route path="/home-insurance" element={<HomeInsurance />} />
-                <Route path="/home-insurance/:id" element={<HomeInsuranceProductDetail />} />
-                <Route path="/product/:id" element={<ProductDetail />} />
-                <Route path="/schemes" element={<Schemes />} />
-                
-                {/* Insurance Application Flow */}
-                <Route 
-                  path="/apply-life" 
-                  element={
-                    <ProtectedRoute>
-                      <LifeInsuranceApplication />
-                    </ProtectedRoute>
-                  } 
-                />
-                <Route 
-                  path="/apply-health" 
-                  element={
-                    <ProtectedRoute>
-                      <HealthInsuranceApplication />
-                    </ProtectedRoute>
-                  } 
-                />
-                <Route 
-                  path="/apply-motor" 
-                  element={
-                    <ProtectedRoute>
-                      <MotorInsuranceApplication />
-                    </ProtectedRoute>
-                  } 
-                />
-                <Route 
-                  path="/apply-home" 
-                  element={
-                    <ProtectedRoute>
-                      <HomeInsuranceApplication />
-                    </ProtectedRoute>
-                  } 
-                />
-                <Route 
-                  path="/application-success" 
-                  element={
-                    <ProtectedRoute>
-                      <ApplicationSuccess />
-                    </ProtectedRoute>
-                  } 
-                />
-                <Route 
-                  path="/application/success" 
-                  element={
-                    <ProtectedRoute>
-                      <ApplicationSuccess />
-                    </ProtectedRoute>
-                  } 
-                />
-                
-                <Route 
-                  path="/dashboard" 
-                  element={
-                    <ProtectedRoute>
-                      <Dashboard />
-                    </ProtectedRoute>
-                  } 
-                />
-                <Route 
-                  path="/calculator" 
-                  element={<PremiumCalculator />} 
-                />
-                <Route 
-                  path="/payment-frequency" 
-                  element={<PaymentFrequencyDemo />} 
-                />
-                <Route 
-                  path="/policies" 
-                  element={
-                    <ProtectedRoute>
-                      <Policies />
-                    </ProtectedRoute>
-                  } 
-                />
-                <Route 
-                  path="/loan-facility" 
-                  element={
-                    <ProtectedRoute>
-                      <LoanFacility />
-                    </ProtectedRoute>
-                  } 
-                />
-                <Route 
-                  path="/claims" 
-                  element={
-                    <ProtectedRoute>
-                      <Claims />
-                    </ProtectedRoute>
-                  } 
-                />
-                <Route 
-                  path="/profile" 
-                  element={
-                    <ProtectedRoute>
-                      <Profile />
-                    </ProtectedRoute>
-                  } 
-                />
-                <Route 
-                  path="/support" 
-                  element={
-                    <ProtectedRoute>
-                      <Support />
-                    </ProtectedRoute>
-                  } 
-                />
-                <Route path="/contact" element={<Contact />} />
-                <Route path="/payment-gateway" element={<PaymentGateway />} />
-                <Route path="/comparison-tool" element={<ComparisonTool />} />
-                <Route path="/agent-support" element={<AgentSupport />} />
-                
-                {/* Admin Routes */}
-                <Route path="/admin/login" element={<AdminLogin />} />
-                <Route 
-                  path="/admin/*" 
-                  element={
-                    <AdminProtectedRoute>
-                      <AdminDashboard />
-                    </AdminProtectedRoute>
-                  } 
-                />
-                
-                <Route path="*" element={<Navigate to="/" replace />} />
-              </Routes>
-              </AppLayout>
-            </div>
+                  <Routes>
+                    <Route path="/" element={<Home />} />
+                    <Route path="/login" element={<Login />} />
+                    <Route path="/register" element={<Register />} />
+                    <Route path="/forgot-password" element={<ForgotPassword />} />
+                    <Route path="/reset-password" element={<ResetPassword />} />
+                    <Route path="/check-email" element={<CheckEmail />} />
+                    <Route path="/verify-email" element={<VerifyEmail />} />
+                    <Route
+                      path="/complete-profile"
+                      element={
+                        <ProtectedRoute>
+                          <CompleteProfile />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/verify-phone"
+                      element={
+                        <ProtectedRoute>
+                          <VerifyPhone />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route path="/life-insurance" element={<LifeInsurance />} />
+                    <Route path="/life-insurance/:id" element={<LifeInsuranceProductDetail />} />
+                    <Route path="/medical-insurance" element={<MedicalInsurance />} />
+                    <Route path="/medical-insurance/:id" element={<MedicalInsuranceProductDetail />} />
+                    <Route path="/motor-insurance" element={<MotorInsurance />} />
+                    <Route path="/motor-insurance/:id" element={<MotorInsuranceProductDetail />} />
+                    <Route path="/home-insurance" element={<HomeInsurance />} />
+                    <Route path="/home-insurance/:id" element={<HomeInsuranceProductDetail />} />
+
+                    <Route path="/schemes" element={<Schemes />} />
+
+                    {/* Insurance Application Flow */}
+                    <Route
+                      path="/apply-life"
+                      element={
+                        <ProtectedRoute>
+                          <LifeInsuranceApplication />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/apply-health"
+                      element={
+                        <ProtectedRoute>
+                          <HealthInsuranceApplication />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/apply-medical"
+                      element={
+                        <ProtectedRoute>
+                          <HealthInsuranceApplication />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/apply-motor"
+                      element={
+                        <ProtectedRoute>
+                          <MotorInsuranceApplication />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/apply-home"
+                      element={
+                        <ProtectedRoute>
+                          <HomeInsuranceApplication />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/application-success"
+                      element={
+                        <ProtectedRoute>
+                          <ApplicationSuccess />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/application/success"
+                      element={
+                        <ProtectedRoute>
+                          <ApplicationSuccess />
+                        </ProtectedRoute>
+                      }
+                    />
+
+                    <Route
+                      path="/dashboard"
+                      element={
+                        <ProtectedRoute>
+                          <Dashboard />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/calculator"
+                      element={<PremiumCalculator />}
+                    />
+                    <Route
+                      path="/payment-frequency"
+                      element={<PaymentFrequencyDemo />}
+                    />
+                    <Route
+                      path="/policies"
+                      element={
+                        <ProtectedRoute>
+                          <Policies />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/loan-facility"
+                      element={
+                        <ProtectedRoute>
+                          <LoanFacility />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/claims"
+                      element={
+                        <ProtectedRoute>
+                          <Claims />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/profile"
+                      element={
+                        <ProtectedRoute>
+                          <Profile />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/support"
+                      element={
+                        <ProtectedRoute>
+                          <Support />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route path="/contact" element={<Contact />} />
+                    <Route path="/payment-gateway" element={<PaymentGateway />} />
+                    <Route path="/comparison-tool" element={<ComparisonTool />} />
+                    <Route path="/agent-support" element={<AgentSupport />} />
+
+                    {/* Admin Routes */}
+                    <Route path="/admin/login" element={<AdminLogin />} />
+                    <Route
+                      path="/admin/*"
+                      element={
+                        <AdminProtectedRoute>
+                          <AdminDashboard />
+                        </AdminProtectedRoute>
+                      }
+                    />
+
+                    <Route path="*" element={<Navigate to="/" replace />} />
+                  </Routes>
+                </AppLayout>
+              </div>
             </ToastProvider>
           </AdminAuthProvider>
         </AuthProvider>

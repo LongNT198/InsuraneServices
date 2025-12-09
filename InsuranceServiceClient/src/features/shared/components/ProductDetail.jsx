@@ -3,11 +3,11 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
-import { 
-  ArrowLeft, 
-  CheckCircle, 
-  XCircle, 
-  Shield, 
+import {
+  ArrowLeft,
+  CheckCircle,
+  XCircle,
+  Shield,
   Heart,
   Activity,
   TrendingUp,
@@ -54,7 +54,7 @@ export function ProductDetail() {
       try {
         setLoading(true);
         setError(null);
-        
+
         // Fetch product details
         const response = await axios.get(`/api/products/${id}`);
         const productData = response.product || response;
@@ -76,7 +76,7 @@ export function ProductDetail() {
           .filter(p => p.productType === productData.productType && p.id !== productData.id)
           .slice(0, 3);
         setRelatedProducts(related);
-        
+
       } catch (err) {
         console.error('Error loading product:', err);
         setError('Failed to load product details. Please try again later.');
@@ -92,7 +92,7 @@ export function ProductDetail() {
 
   // Get color theme based on product type
   const getColorTheme = (type) => {
-    switch(type) {
+    switch (type) {
       case 'Life':
         return {
           gradient: 'from-red-600 to-pink-700',
@@ -170,17 +170,17 @@ export function ProductDetail() {
   useEffect(() => {
     const loadPlanPrices = async () => {
       if (plans.length === 0) return;
-      
+
       setCalculatingPrices(true);
       const prices = {};
-      
+
       for (const plan of plans) {
         const price = await calculatePlanPremium(plan.id, selectedFrequency);
         if (price) {
           prices[plan.id] = price;
         }
       }
-      
+
       setPlanPrices(prices);
       setCalculatingPrices(false);
     };
@@ -197,7 +197,7 @@ export function ProductDetail() {
       'Motor': '/apply-motor',
       'Home': '/apply-home',
     };
-    
+
     const route = baseRoutes[productType] || '/apply-life';
     const queryParams = new URLSearchParams(params).toString();
     return queryParams ? `${route}?${queryParams}` : route;
@@ -236,7 +236,7 @@ export function ProductDetail() {
   const getProductFeatures = () => {
     const productCode = product?.productCode;
     if (!productCode) return [];
-    
+
     // LIFE INSURANCE
     if (productCode === 'LIFE-001') { // Term Life
       return [
@@ -354,7 +354,7 @@ export function ProductDetail() {
   const getCoveredItems = () => {
     const productCode = product?.productCode;
     if (!productCode) return [];
-    
+
     // LIFE INSURANCE
     if (productCode.startsWith('LIFE-001')) return [
       'Death benefit payout to nominees',
@@ -471,7 +471,7 @@ export function ProductDetail() {
   const getExclusions = () => {
     const productCode = product?.productCode;
     if (!productCode) return [];
-    
+
     // LIFE INSURANCE
     if (productCode.startsWith('LIFE-')) return [
       'Suicide within first 12 months',
@@ -523,7 +523,7 @@ export function ProductDetail() {
   // Additional benefits
   const getAdditionalBenefits = () => {
     if (!product?.productType) return [];
-    switch(product.productType) {
+    switch (product.productType) {
       case 'Life':
         return [
           { icon: Gift, title: 'Loyalty Bonus', desc: 'Extra benefits for long-term policyholders' },
@@ -560,7 +560,7 @@ export function ProductDetail() {
   // Claims process steps
   const getClaimsProcess = () => {
     if (!product?.productType) return [];
-    switch(product.productType) {
+    switch (product.productType) {
       case 'Life':
         return [
           { step: '1', title: 'Notify Insurer', desc: 'Inform within 7 days of event' },
@@ -597,7 +597,7 @@ export function ProductDetail() {
   // Eligibility criteria
   const getEligibilityCriteria = () => {
     if (!product?.productType) return { minAge: 18, maxAge: 65, requirements: [] };
-    switch(product.productType) {
+    switch (product.productType) {
       case 'Life':
         return {
           minAge: 18,
@@ -674,15 +674,15 @@ export function ProductDetail() {
       <section className={`bg-gradient-to-br ${colors.gradient} text-white py-12`}>
         <div className="container mx-auto px-4">
           <div className="max-w-4xl mx-auto">
-            <Button 
-              variant="ghost" 
+            <Button
+              variant="ghost"
               onClick={() => navigate(-1)}
               className="mb-6 text-white hover:bg-white/10"
             >
               <ArrowLeft className="size-4 mr-2" />
               Back
             </Button>
-            
+
             <div className="flex items-start justify-between gap-6">
               <div>
                 <div className="flex items-center gap-3 mb-4">
@@ -697,7 +697,7 @@ export function ProductDetail() {
                 </div>
                 <h1 className="text-4xl font-bold mb-4">{product.productName}</h1>
                 <p className="text-lg text-white/90 mb-6">{product.description}</p>
-                
+
                 <div className="flex gap-4">
                   <Button size="lg" variant="secondary" asChild>
                     <Link to={getApplicationRoute(product.productType, {
@@ -706,9 +706,9 @@ export function ProductDetail() {
                       Apply Now
                     </Link>
                   </Button>
-                  <Button 
-                    size="lg" 
-                    variant="outline" 
+                  <Button
+                    size="lg"
+                    variant="outline"
                     className="bg-transparent border-white text-white hover:bg-white hover:text-gray-900"
                   >
                     <Phone className="size-4 mr-2" />
@@ -716,7 +716,7 @@ export function ProductDetail() {
                   </Button>
                 </div>
               </div>
-              
+
               {/* Quick Stats */}
               <Card className="min-w-[300px]">
                 <CardContent className="p-6 space-y-4">
@@ -853,11 +853,10 @@ export function ProductDetail() {
                           key={freq.value}
                           onClick={() => setSelectedFrequency(freq.value)}
                           disabled={calculatingPrices}
-                          className={`p-4 rounded-lg border-2 transition-all ${
-                            selectedFrequency === freq.value
+                          className={`p-4 rounded-lg border-2 transition-all ${selectedFrequency === freq.value
                               ? `${colorTheme.border} ${colorTheme.bg} ${colorTheme.text} font-semibold shadow-md scale-105`
                               : 'border-gray-200 hover:border-gray-300 bg-white text-gray-700 hover:shadow-sm hover:scale-102'
-                          } ${calculatingPrices ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            } ${calculatingPrices ? 'opacity-50 cursor-not-allowed' : ''}`}
                         >
                           <div className="flex items-center gap-2 mb-1">
                             <FreqIcon className="size-4" />
@@ -879,7 +878,7 @@ export function ProductDetail() {
                     const colorTheme = getColorTheme(product.productType);
                     const calculatedPrice = planPrices[plan.id];
                     const isCalculating = calculatingPrices || !calculatedPrice;
-                    
+
                     // Prepare benefits list
                     const benefits = [];
                     benefits.push(`${(plan.coverageAmount / 1000).toFixed(0)}k coverage for ${plan.termYears} years`);
@@ -898,13 +897,12 @@ export function ProductDetail() {
                     if (plan.includesRiderOptions) {
                       benefits.push('Additional riders available');
                     }
-                    
+
                     return (
-                      <Card 
-                        key={plan.id} 
-                        className={`hover:shadow-xl transition-all ${
-                          plan.isPopular ? `border-2 ${colorTheme.border} shadow-lg` : ''
-                        }`}
+                      <Card
+                        key={plan.id}
+                        className={`hover:shadow-xl transition-all ${plan.isPopular ? `border-2 ${colorTheme.border} shadow-lg` : ''
+                          }`}
                       >
                         <CardHeader>
                           {plan.isPopular && (
@@ -987,8 +985,8 @@ export function ProductDetail() {
                             </div>
 
                             {/* CTA Button */}
-                            <Button 
-                              className="w-full group" 
+                            <Button
+                              className="w-full group"
                               size="lg"
                               variant={plan.isPopular ? "default" : "outline"}
                               disabled={isCalculating}
@@ -1005,7 +1003,7 @@ export function ProductDetail() {
                                 };
                                 console.log('💾 ProductDetail: Saving quote to localStorage:', paramsToSave);
                                 localStorage.setItem('calculatorParams', JSON.stringify(paramsToSave));
-                                
+
                                 const route = getApplicationRoute(product.productType, {
                                   productId: product.id,
                                   planId: plan.id,
@@ -1031,7 +1029,7 @@ export function ProductDetail() {
                   <Info className="size-6 text-blue-600 mx-auto mb-3" />
                   <h3 className="font-semibold text-gray-900 mb-2">Need Help Choosing?</h3>
                   <p className="text-sm text-gray-600 mb-4 max-w-2xl mx-auto">
-                    Prices shown are estimates based on standard rates (age 30, good health, low-risk occupation). 
+                    Prices shown are estimates based on standard rates (age 30, good health, low-risk occupation).
                     Your actual premium may vary based on age, health status, occupation, and other factors.
                   </p>
                   <div className="flex gap-3 justify-center flex-wrap">
@@ -1177,7 +1175,7 @@ export function ProductDetail() {
                         <h4 className="font-semibold text-gray-900 mb-2">{step.title}</h4>
                         <p className="text-sm text-gray-600">{step.desc}</p>
                         {index < getClaimsProcess().length - 1 && (
-                          <div className="hidden md:block absolute top-8 left-full w-full h-0.5 bg-gray-200" style={{transform: 'translateX(-50%)'}} />
+                          <div className="hidden md:block absolute top-8 left-full w-full h-0.5 bg-gray-200" style={{ transform: 'translateX(-50%)' }} />
                         )}
                       </div>
                     ))}
@@ -1271,11 +1269,11 @@ export function ProductDetail() {
                 {[
                   {
                     q: `What is the waiting period for this ${product?.productType?.toLowerCase() || 'insurance'} insurance?`,
-                    a: product?.productType === 'Life' 
+                    a: product?.productType === 'Life'
                       ? 'Life insurance typically has no waiting period for accidental death. For natural death, most policies have a waiting period of 30-90 days. Suicide is excluded in the first year.'
                       : (product.productType === 'Medical' || product.productType === 'Health')
-                      ? 'Initial waiting period of 30 days for illnesses (not applicable for accidents). Pre-existing diseases have 2-4 years waiting period. Specific diseases like hernia, cataract may have 1-2 years waiting.'
-                      : 'Most policies become effective immediately after payment. However, check your policy document for specific waiting periods if any.'
+                        ? 'Initial waiting period of 30 days for illnesses (not applicable for accidents). Pre-existing diseases have 2-4 years waiting period. Specific diseases like hernia, cataract may have 1-2 years waiting.'
+                        : 'Most policies become effective immediately after payment. However, check your policy document for specific waiting periods if any.'
                   },
                   {
                     q: 'Can I increase my coverage amount later?',
@@ -1418,9 +1416,9 @@ export function ProductDetail() {
                 Apply Now
               </Link>
             </Button>
-            <Button 
-              size="lg" 
-              variant="outline" 
+            <Button
+              size="lg"
+              variant="outline"
               className="bg-transparent border-white text-white hover:bg-white hover:text-gray-900"
             >
               Compare Plans

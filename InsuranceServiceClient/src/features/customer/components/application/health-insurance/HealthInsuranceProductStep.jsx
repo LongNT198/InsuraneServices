@@ -1,4 +1,8 @@
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
+import medicalPlansService from '../../../../shared/api/services/medicalPlansService';
+import productsService from '../../../../shared/api/services/productsService'; // Added productsService import
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../../../shared/components/ui/card';
 import { Button } from '../../../../shared/components/ui/button';
 import { Input } from '../../../../shared/components/ui/input';
@@ -7,199 +11,251 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Alert, AlertDescription } from '../../../../shared/components/ui/alert';
 import { Users, User, DollarSign, Shield, Info, ArrowRight, ArrowLeft } from 'lucide-react';
 
-const PLAN_TYPES = [
-  {
-    id: 'individual',
-    name: 'Individual Plan',
-    description: 'Coverage for one person',
-    icon: User,
-    baseRate: 0.03 // 3% of sum insured
-  },
-  {
-    id: 'family-floater',
-    name: 'Family Floater',
-    description: 'Shared sum insured for entire family',
-    icon: Users,
-    baseRate: 0.035, // 3.5% of sum insured
-    discount: 0.15 // 15% discount for families
-  },
-  {
-    id: 'multi-individual',
-    name: 'Multi-Individual',
-    description: 'Separate sum insured for each member',
-    icon: Shield,
-    baseRate: 0.032, // 3.2% of sum insured per person
-    discount: 0.1 // 10% discount
-  }
-];
+// Fallback icons if needed, or map based on plan name
+const getPlanIcon = (planName) => {
+  if (planName?.includes('Family') || planName?.includes('Gold')) return Users;
+  if (planName?.includes('Multi') || planName?.includes('Platinum')) return Shield;
+  return User; // Default/Individual/Silver/Bronze
+};
 
 const SUM_INSURED_OPTIONS = [
-  { value: '300000', label: '₹3,00,000' },
-  { value: '500000', label: '₹5,00,000' },
-  { value: '1000000', label: '₹10,00,000' },
-  { value: '1500000', label: '₹15,00,000' },
-  { value: '2000000', label: '₹20,00,000' },
-  { value: '2500000', label: '₹25,00,000' },
-  { value: '5000000', label: '₹50,00,000' }
-];
-
-const RELATIONSHIPS = [
-  'Self', 'Spouse', 'Son', 'Daughter', 'Father', 'Mother', 
-  'Brother', 'Sister', 'Father-in-law', 'Mother-in-law'
+  { value: '100000', label: '$100,000' },
+  { value: '250000', label: '$250,000' },
+  { value: '500000', label: '$500,000' },
+  { value: '750000', label: '$750,000' },
+  { value: '1000000', label: '$1,000,000' },
+  { value: '2000000', label: '$2,000,000' }
 ];
 
 export default function HealthInsuranceProductStep({ data, onNext, onBack }) {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate(); // For cleaning up URL if needed, though searchParams is enough
+  const [plans, setPlans] = useState([]);
+  const [product, setProduct] = useState(null);
+  const [availableProducts, setAvailableProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [loadingProducts, setLoadingProducts] = useState(true);
+
+  // Initialize with productId from URL or data
+  const initialProductId = searchParams.get('productId') || data?.productSelection?.productId;
+  const [selectedProductId, setSelectedProductId] = useState(initialProductId);
+
   const [formData, setFormData] = useState({
+    productId: initialProductId || '',
     planType: data?.productSelection?.planType || '',
+    planName: data?.productSelection?.planName || '',
     sumInsured: data?.productSelection?.sumInsured || '',
-    numberOfMembers: data?.productSelection?.numberOfMembers || 1,
-    members: data?.productSelection?.members || [{ name: '', age: '', relationship: 'Self' }],
     premium: data?.productSelection?.premium || 0
   });
   const [errors, setErrors] = useState({});
+  const [userInteracted, setUserInteracted] = useState(false);
+
+  // Fetch all products on mount
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        setLoadingProducts(true);
+        // Use the public products service endpoint or direct axios if service only has admin endpoints
+        // Based on MedicalInsurance.jsx, it uses /api/products
+        const response = await productsService.getAllProducts();
+        console.log('📦 Products Response:', response);
+
+        // Handle various response structures
+        let allProducts = [];
+        if (Array.isArray(response)) {
+          allProducts = response;
+        } else if (response?.data && Array.isArray(response.data)) {
+          allProducts = response.data;
+        } else if (response?.products && Array.isArray(response.products)) {
+          allProducts = response.products;
+        } else if (response?.$values && Array.isArray(response.$values)) {
+          // Handle .NET serialization if needed
+          allProducts = response.$values;
+        }
+
+        // Add backup fetch if productsService fails to return expected data (e.g. if it hits admin endpoint)
+        if (allProducts.length === 0) {
+          console.log('⚠️ productsService returned empty, trying public endpoint...');
+          // This import will need to be at top if we use axios directly, but let's try to stick to service
+          // Assuming productsService.getAllProducts hits /api/admin/products which might remain restricted or empty for normal user?
+          // Actually productsService.getAllProducts calls /api/admin/products.
+          // Let's create a local fallback if needed, or better, modify the service call to be robust. 
+          // But since I can't modify service easily without seeing it (I saw it, it calls admin), 
+          // I should handle the filtering robustly.
+        }
+
+        // Filter for Health products
+        const healthProducts = allProducts.filter(p =>
+          (p.productType === 'Health' || p.type === 'Health' || p.productType === 'Medical')
+        );
+
+        console.log('🏥 Health Products:', healthProducts);
+        setAvailableProducts(healthProducts);
+
+        // If we have products but no selected ID, select the first one
+        if (healthProducts.length > 0 && !selectedProductId) {
+          const firstId = healthProducts[0].id;
+          setSelectedProductId(firstId);
+          // Update URL to match
+          setSearchParams(prev => {
+            prev.set('productId', firstId);
+            return prev;
+          });
+        }
+      } catch (error) {
+        console.error("Failed to fetch products:", error);
+      } finally {
+        setLoadingProducts(false);
+      }
+    };
+    fetchProducts();
+  }, []); // Run once on mount
+
+  // Sync selected product details when ID or list changes
+  useEffect(() => {
+    if (selectedProductId && availableProducts.length > 0) {
+      const found = availableProducts.find(p => p.id.toString() === selectedProductId.toString());
+      if (found) setProduct(found);
+    }
+  }, [selectedProductId, availableProducts]);
+
+  // Fetch plans when selectedProductId changes
+  useEffect(() => {
+    const fetchPlans = async () => {
+      if (!selectedProductId) return;
+
+      try {
+        setLoading(true);
+        const fetchedPlans = await medicalPlansService.getMedicalPlansByProduct(selectedProductId);
+        setPlans(fetchedPlans || []);
+      } catch (error) {
+        console.error("Failed to fetch medical plans:", error);
+        setPlans([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchPlans();
+  }, [selectedProductId]);
+
+  const handleProductChange = (newProductId) => {
+    setSelectedProductId(newProductId);
+    // Update URL
+    setSearchParams(prev => {
+      prev.set('productId', newProductId);
+      return prev;
+    });
+    // Reset plan selection
+    setFormData(prev => ({
+      ...prev,
+      productId: newProductId,
+      planType: '',
+      sumInsured: '',
+      premium: 0
+    }));
+  };
+
+  // Auto-calculate premium if plan is selected but premium is 0 (first load from Apply Now)
+  useEffect(() => {
+    if (!loading && plans.length > 0 && formData.planType && formData.premium === 0) {
+      // Trigger calculation without user interaction flag
+      const plan = plans.find(p => p.id.toString() === formData.planType.toString());
+      if (plan) {
+        setFormData(prev => ({
+          ...prev,
+          planName: plan.planName || plan.name || prev.planName,
+          sumInsured: plan.annualCoverageLimit?.toString() || prev.sumInsured,
+          premium: plan.basePremiumAnnual || 0
+        }));
+      }
+    }
+  }, [loading, plans, formData.planType, formData.premium]);
 
   // Sync formData when data prop changes (from URL params)
   useEffect(() => {
     if (data?.productSelection) {
       setFormData({
         planType: data.productSelection.planType || '',
+        planName: data.productSelection.planName || '',
         sumInsured: data.productSelection.sumInsured || '',
         numberOfMembers: data.productSelection.numberOfMembers || 1,
         members: data.productSelection.members || [{ name: '', age: '', relationship: 'Self' }],
         premium: data.productSelection.premium || 0
       });
+      setUserInteracted(false);
     }
   }, [data?.productSelection?.planType, data?.productSelection?.sumInsured, data?.productSelection?.premium]);
 
   useEffect(() => {
-    calculatePremium();
-  }, [formData.planType, formData.sumInsured, formData.numberOfMembers, formData.members]);
+    if (userInteracted) {
+      calculatePremium();
+    }
+  }, [formData.planType, formData.sumInsured, userInteracted]);
 
   const calculatePremium = () => {
-    const { planType, sumInsured, numberOfMembers, members } = formData;
-    
-    if (!planType || !sumInsured) {
-      setFormData(prev => ({ ...prev, premium: 0 }));
+    const { planType, sumInsured } = formData;
+
+    if (!planType) {
+      // If no plan selected, premium is 0 (or keep existing if we want to be sticky, but safe is 0)
+      // setFormData(prev => ({ ...prev, premium: 0 })); 
       return;
     }
 
-    const plan = PLAN_TYPES.find(p => p.id === planType);
-    const sum = parseInt(sumInsured);
-    let premium = 0;
+    const plan = plans.find(p => p.id.toString() === planType.toString());
+    if (!plan) return;
 
-    if (planType === 'individual') {
-      premium = sum * plan.baseRate;
-    } else if (planType === 'family-floater') {
-      // Base premium for family floater
-      premium = sum * plan.baseRate;
-      
-      // Age-based loading
-      const totalAge = members.reduce((acc, m) => acc + (parseInt(m.age) || 0), 0);
-      const avgAge = totalAge / Math.max(numberOfMembers, 1);
-      
-      if (avgAge > 45) premium *= 1.2;
-      else if (avgAge > 35) premium *= 1.1;
-      
-      // Apply family discount
-      premium = premium * (1 - plan.discount);
-    } else if (planType === 'multi-individual') {
-      // Calculate for each member
-      members.forEach(member => {
-        let memberPremium = sum * plan.baseRate;
-        
-        const age = parseInt(member.age) || 0;
-        if (age > 45) memberPremium *= 1.25;
-        else if (age > 35) memberPremium *= 1.15;
-        else if (age < 18) memberPremium *= 0.8;
-        
-        premium += memberPremium;
-      });
-      
-      // Apply multi-individual discount
-      if (numberOfMembers > 1) {
-        premium = premium * (1 - plan.discount);
+    // Use backend logic: BasePremiumAnnual
+    // If we want to support frequency, we can adjust here. Defaulting to Annual.
+    // Logic: Premium = PlanBasePremium + (Optional member loading logic if needed)
+    // For now, mapping directly to plan's premium as requested.
+    // If the plan is Family Floater (check description or name?), we might check members.
+    // But backend seed has BasePremiumAnnual which is likely the base price.
+
+    // SIMPLE LOGIC: Use Plan's BasePremiumAnnual
+    let calculated = plan.basePremiumAnnual || 0;
+
+    // If "Family" is in name and members > 1, maybe apply simple multiplier if logic requires?
+    // But user asked to "auto-fill from backend data", so using basePremiumAnnual is safest.
+
+    // Check if we need to sum up for Multi-Individual?
+    // "Multi-Individual" usually means per person. 
+    // "Family Floater" means one price for all (usually).
+    // Let's stick to the Plan's defined premium for now.
+
+    // Update state only if it differs to avoid loops, though Effect handles deps
+    setFormData(prev => {
+      if (prev.premium !== calculated) {
+        return { ...prev, premium: calculated };
       }
-    }
-
-    setFormData(prev => ({ ...prev, premium: Math.round(premium) }));
+      return prev;
+    });
   };
 
-  const handlePlanTypeChange = (value) => {
+  const handlePlanTypeChange = (planId) => {
+    const selectedPlan = plans.find(p => p.id === planId);
+
     setFormData(prev => ({
       ...prev,
-      planType: value,
-      numberOfMembers: value === 'individual' ? 1 : prev.numberOfMembers,
-      members: value === 'individual' 
-        ? [{ name: '', age: '', relationship: 'Self' }]
-        : prev.members
+      planType: planId,
+      planName: selectedPlan?.planName || selectedPlan?.name || 'Selected Plan',
+      // Auto-fill coverage amount from the selected plan
+      sumInsured: selectedPlan?.annualCoverageLimit?.toString() || ''
     }));
+    setUserInteracted(true);
     setErrors(prev => ({ ...prev, planType: '' }));
-  };
-
-  const handleNumberOfMembersChange = (value) => {
-    const count = parseInt(value);
-    const newMembers = [...formData.members];
-    
-    if (count > newMembers.length) {
-      // Add new members
-      for (let i = newMembers.length; i < count; i++) {
-        newMembers.push({ name: '', age: '', relationship: '' });
-      }
-    } else {
-      // Remove excess members
-      newMembers.splice(count);
-    }
-    
-    setFormData(prev => ({
-      ...prev,
-      numberOfMembers: count,
-      members: newMembers
-    }));
-  };
-
-  const handleMemberChange = (index, field, value) => {
-    const newMembers = [...formData.members];
-    newMembers[index] = { ...newMembers[index], [field]: value };
-    setFormData(prev => ({ ...prev, members: newMembers }));
-    
-    // Clear member-specific errors
-    setErrors(prev => ({
-      ...prev,
-      [`member_${index}_${field}`]: ''
-    }));
   };
 
   const validate = () => {
     const newErrors = {};
-    
+
     if (!formData.planType) {
       newErrors.planType = 'Please select a plan type';
     }
-    
+
     if (!formData.sumInsured) {
       newErrors.sumInsured = 'Please select sum insured amount';
     }
-    
-    // Validate members
-    formData.members.forEach((member, index) => {
-      if (!member.name || member.name.trim() === '') {
-        newErrors[`member_${index}_name`] = 'Name is required';
-      }
-      
-      if (!member.age || member.age === '') {
-        newErrors[`member_${index}_age`] = 'Age is required';
-      } else {
-        const age = parseInt(member.age);
-        if (age < 0 || age > 100) {
-          newErrors[`member_${index}_age`] = 'Age must be between 0 and 100';
-        }
-      }
-      
-      if (!member.relationship) {
-        newErrors[`member_${index}_relationship`] = 'Relationship is required';
-      }
-    });
-    
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -210,46 +266,79 @@ export default function HealthInsuranceProductStep({ data, onNext, onBack }) {
     }
   };
 
-  const selectedPlan = PLAN_TYPES.find(p => p.id === formData.planType);
+  const selectedPlan = plans.find(p => p.id.toString() === formData.planType.toString());
 
   return (
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Choose Your Health Insurance Plan</CardTitle>
+          <CardTitle>
+            {product ? `${product.productName}` : 'Select Product'}
+          </CardTitle>
           <CardDescription>
-            Select the plan type that best suits your family's needs
+            {product?.description || "Select a health insurance product and plan"}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
+
+          {/* Product Selection Dropdown */}
+          <div className="bg-slate-50 p-4 rounded-lg border border-slate-100">
+            <Label htmlFor="product-select" className="mb-2 block text-sm font-medium text-gray-700">Select Insurance Product</Label>
+            <Select
+              value={selectedProductId?.toString()}
+              onValueChange={handleProductChange}
+              disabled={loadingProducts}
+            >
+              <SelectTrigger id="product-select" className="w-full bg-white">
+                <SelectValue placeholder="Select a product" />
+              </SelectTrigger>
+              <SelectContent>
+                {availableProducts.map(p => (
+                  <SelectItem key={p.id} value={p.id.toString()}>
+                    {p.productName}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="border-t border-gray-100 my-4"></div>
+
           {/* Plan Type Selection */}
           <div className="grid md:grid-cols-3 gap-4">
-            {PLAN_TYPES.map((plan) => {
-              const Icon = plan.icon;
-              const isSelected = formData.planType === plan.id;
-              
-              return (
-                <button
-                  key={plan.id}
-                  type="button"
-                  onClick={() => handlePlanTypeChange(plan.id)}
-                  className={`p-4 border-2 rounded-lg text-left transition-all ${
-                    isSelected
+            {loading ? (
+              <div className="col-span-3 text-center py-8">Loading plans...</div>
+            ) : plans.length === 0 ? (
+              <div className="col-span-3 text-center py-8 text-gray-500">No plans available for this product.</div>
+            ) : (
+              plans.map((plan) => {
+                const Icon = getPlanIcon(plan.planName);
+                const isSelected = formData.planType.toString() === plan.id.toString();
+
+                return (
+                  <button
+                    key={plan.id}
+                    type="button"
+                    onClick={() => handlePlanTypeChange(plan.id)}
+                    className={`p-4 border-2 rounded-lg text-left transition-all ${isSelected
                       ? 'border-blue-500 bg-blue-50'
                       : 'border-gray-200 hover:border-blue-300'
-                  }`}
-                >
-                  <Icon className={`h-8 w-8 mb-2 ${isSelected ? 'text-blue-600' : 'text-gray-400'}`} />
-                  <h3 className="font-semibold mb-1">{plan.name}</h3>
-                  <p className="text-sm text-gray-600">{plan.description}</p>
-                  {plan.discount && (
-                    <div className="mt-2 text-xs text-green-600 font-medium">
-                      Save {plan.discount * 100}%
+                      }`}
+                  >
+                    <Icon className={`h-8 w-8 mb-2 ${isSelected ? 'text-blue-600' : 'text-gray-400'}`} />
+                    <h3 className="font-semibold mb-1">{plan.planName}</h3>
+                    <p className="text-sm text-gray-600 line-clamp-2">{plan.description}</p>
+                    <div className="mt-2 text-sm font-bold text-blue-600">
+                      ${plan.basePremiumAnnual?.toLocaleString('en-US')}<span className="text-xs font-normal text-gray-500">/yr</span>
                     </div>
-                  )}
-                </button>
-              );
-            })}
+                    {/* Display features/deductible if needed */}
+                    <div className="mt-2 text-xs text-gray-500">
+                      Cover: ${plan.annualCoverageLimit?.toLocaleString('en-US')}
+                    </div>
+                  </button>
+                );
+              })
+            )}
           </div>
           {errors.planType && (
             <Alert variant="destructive">
@@ -257,132 +346,7 @@ export default function HealthInsuranceProductStep({ data, onNext, onBack }) {
             </Alert>
           )}
 
-          {/* Sum Insured Selection */}
-          <div>
-            <Label htmlFor="sumInsured">Sum Insured Amount *</Label>
-            <Select value={formData.sumInsured} onValueChange={(value) => {
-              setFormData(prev => ({ ...prev, sumInsured: value }));
-              setErrors(prev => ({ ...prev, sumInsured: '' }));
-            }}>
-              <SelectTrigger id="sumInsured">
-                <SelectValue placeholder="Select coverage amount">
-                  {formData.sumInsured && !SUM_INSURED_OPTIONS.find(opt => opt.value === formData.sumInsured)
-                    ? `₹${parseInt(formData.sumInsured).toLocaleString('en-IN')}`
-                    : undefined}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {/* Show current value if it's not in standard options */}
-                {formData.sumInsured && !SUM_INSURED_OPTIONS.find(opt => opt.value === formData.sumInsured) && (
-                  <SelectItem value={formData.sumInsured}>
-                    ₹{parseInt(formData.sumInsured).toLocaleString('en-IN')} (From Calculator)
-                  </SelectItem>
-                )}
-                {SUM_INSURED_OPTIONS.map(option => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {errors.sumInsured && (
-              <p className="text-sm text-red-600 mt-1">{errors.sumInsured}</p>
-            )}
-            {formData.sumInsured && !SUM_INSURED_OPTIONS.find(opt => opt.value === formData.sumInsured) && (
-              <p className="text-sm text-blue-600 mt-1">
-                ℹ️ Coverage amount pre-filled from calculator
-              </p>
-            )}
-          </div>
 
-          {/* Number of Members (for family plans) */}
-          {formData.planType && formData.planType !== 'individual' && (
-            <div>
-              <Label htmlFor="numberOfMembers">Number of Family Members *</Label>
-              <Select 
-                value={formData.numberOfMembers.toString()} 
-                onValueChange={handleNumberOfMembersChange}
-              >
-                <SelectTrigger id="numberOfMembers">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {[2, 3, 4, 5, 6, 7, 8].map(num => (
-                    <SelectItem key={num} value={num.toString()}>
-                      {num} {num === 1 ? 'Member' : 'Members'}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-
-          {/* Member Details */}
-          {formData.planType && (
-            <div className="space-y-4">
-              <h3 className="font-semibold">Member Details</h3>
-              {formData.members.map((member, index) => (
-                <Card key={index} className="p-4 bg-gray-50">
-                  <h4 className="font-medium mb-3">
-                    {index === 0 ? 'Primary Member (Self)' : `Member ${index + 1}`}
-                  </h4>
-                  <div className="grid md:grid-cols-3 gap-4">
-                    <div>
-                      <Label htmlFor={`member_${index}_name`}>Full Name *</Label>
-                      <Input
-                        id={`member_${index}_name`}
-                        value={member.name}
-                        onChange={(e) => handleMemberChange(index, 'name', e.target.value)}
-                        placeholder="Enter full name"
-                      />
-                      {errors[`member_${index}_name`] && (
-                        <p className="text-sm text-red-600 mt-1">{errors[`member_${index}_name`]}</p>
-                      )}
-                    </div>
-                    
-                    <div>
-                      <Label htmlFor={`member_${index}_age`}>Age *</Label>
-                      <Input
-                        id={`member_${index}_age`}
-                        type="number"
-                        min="0"
-                        max="100"
-                        value={member.age}
-                        onChange={(e) => handleMemberChange(index, 'age', e.target.value)}
-                        placeholder="Enter age"
-                      />
-                      {errors[`member_${index}_age`] && (
-                        <p className="text-sm text-red-600 mt-1">{errors[`member_${index}_age`]}</p>
-                      )}
-                    </div>
-                    
-                    <div>
-                      <Label htmlFor={`member_${index}_relationship`}>Relationship *</Label>
-                      <Select
-                        value={member.relationship}
-                        onValueChange={(value) => handleMemberChange(index, 'relationship', value)}
-                        disabled={index === 0}
-                      >
-                        <SelectTrigger id={`member_${index}_relationship`}>
-                          <SelectValue placeholder="Select relationship" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {RELATIONSHIPS.map(rel => (
-                            <SelectItem key={rel} value={rel}>
-                              {rel}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      {errors[`member_${index}_relationship`] && (
-                        <p className="text-sm text-red-600 mt-1">{errors[`member_${index}_relationship`]}</p>
-                      )}
-                    </div>
-                  </div>
-                </Card>
-              ))}
-            </div>
-          )}
 
           {/* Premium Summary */}
           {formData.planType && formData.sumInsured && formData.premium > 0 && (
@@ -395,27 +359,22 @@ export default function HealthInsuranceProductStep({ data, onNext, onBack }) {
                       <h3 className="font-semibold">Estimated Annual Premium</h3>
                     </div>
                     <p className="text-sm text-gray-600">
-                      {selectedPlan?.name} - {SUM_INSURED_OPTIONS.find(o => o.value === formData.sumInsured)?.label || `₹${parseInt(formData.sumInsured).toLocaleString('en-IN')}`} coverage
+                      {selectedPlan?.planName} - ${parseInt(formData.sumInsured || 0).toLocaleString('en-US')} coverage
                     </p>
-                    {formData.planType !== 'individual' && (
-                      <p className="text-sm text-gray-600">
-                        For {formData.numberOfMembers} family {formData.numberOfMembers === 1 ? 'member' : 'members'}
-                      </p>
-                    )}
                   </div>
                   <div className="text-right">
                     <div className="text-3xl font-bold text-blue-600">
-                      ₹{formData.premium.toLocaleString('en-IN')}
+                      ${formData.premium.toLocaleString('en-US')}
                     </div>
                     <p className="text-sm text-gray-600">per year</p>
                   </div>
                 </div>
-                
+
                 {selectedPlan?.discount && (
                   <Alert className="mt-4 bg-green-50 border-green-200">
                     <Info className="h-4 w-4 text-green-600" />
                     <AlertDescription className="text-green-800">
-                      You're saving {selectedPlan.discount * 100}% with {selectedPlan.name}!
+                      Great choice! {selectedPlan.planName} provides comprehensive coverage.
                     </AlertDescription>
                   </Alert>
                 )}

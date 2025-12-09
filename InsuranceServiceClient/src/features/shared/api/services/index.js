@@ -1,4 +1,4 @@
-// Export tất cả services để dễ dàng import
+// Export all services for API  
 export { default as authService } from './authService';
 export { default as registrationService } from './registrationService';
 export { default as productsService } from './productsService';

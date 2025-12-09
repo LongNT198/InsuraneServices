@@ -148,7 +148,7 @@ builder.Services.AddCors(options =>
     var allowedOrigins = corsOriginsEnv?.Split(',', StringSplitOptions.RemoveEmptyEntries)
         .Select(o => o.Trim())
         .ToArray()
-        ?? new[] { "http://localhost:5173" };
+        ?? new[] { "http://localhost:5173", "http://localhost:5174" }; // Support both Vite default ports
 
     options.AddPolicy("AllowReactApp", policy =>
     {
